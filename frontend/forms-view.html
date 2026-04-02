@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>填寫表單 | 社團表單系統</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@500;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="assets/css/app.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="container nav">
+        <a href="index.html" class="brand">Club Form Studio</a>
+        <nav class="menu">
+          <a class="link-btn" href="dashboard.html">儀表板</a>
+          <a class="link-btn" href="login.html">登入</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container section">
+      <article class="panel fade-up">
+        <span class="pill">公開表單</span>
+        <h2>迎新活動滿意度調查</h2>
+        <p class="muted">請依照你的參與感受填寫，約 2 分鐘完成。</p>
+
+        <form id="submitForm">
+          <div data-role="result"></div>
+
+          <section class="question">
+            <div class="question-title">1. 你對活動流程安排滿意嗎？</div>
+            <div class="option-line">
+              <input type="radio" name="q1" required /> 非常滿意
+            </div>
+            <div class="option-line">
+              <input type="radio" name="q1" required /> 滿意
+            </div>
+            <div class="option-line">
+              <input type="radio" name="q1" required /> 普通
+            </div>
+            <div class="option-line">
+              <input type="radio" name="q1" required /> 不滿意
+            </div>
+            <div class="error"></div>
+          </section>
+
+          <section class="question">
+            <div class="question-title">2. 你最喜歡哪一個環節？</div>
+            <input required placeholder="請輸入你的想法" />
+            <div class="error"></div>
+          </section>
+
+          <section class="question">
+            <div class="question-title">3. 你希望下次新增什麼內容？</div>
+            <textarea
+              required
+              rows="4"
+              placeholder="例如：分組活動、講師 QA、更多互動遊戲"
+            ></textarea>
+            <div class="error"></div>
+          </section>
+
+          <button class="btn btn-primary" type="submit">提交表單</button>
+        </form>
+      </article>
+    </main>
+
+    <footer class="footer container">
+      這是靜態頁示範，提交後僅顯示前端成功訊息。
+    </footer>
+
+    <script src="assets/js/app.js"></script>
+  </body>
+</html>

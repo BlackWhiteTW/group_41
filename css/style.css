@@ -1,0 +1,406 @@
+/* 社團表單系統 - 自定義CSS */
+
+:root {
+  --primary-color: #667eea;
+  --secondary-color: #764ba2;
+  --success-color: #28a745;
+  --danger-color: #dc3545;
+  --warning-color: #ffc107;
+  --info-color: #17a2b8;
+  --light-bg: #f8f9fa;
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: "Segoe UI", "Microsoft JhengHei", sans-serif;
+  background-color: var(--light-bg);
+}
+
+/* 導航欄 */
+.navbar {
+  background: linear-gradient(
+    135deg,
+    var(--primary-color) 0%,
+    var(--secondary-color) 100%
+  );
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.navbar-brand {
+  font-weight: 700;
+  font-size: 1.3rem;
+}
+
+.navbar-brand:hover {
+  opacity: 0.8;
+}
+
+/* 卡片 */
+.card {
+  border: none;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.card-header {
+  background: linear-gradient(
+    135deg,
+    var(--primary-color) 0%,
+    var(--secondary-color) 100%
+  );
+  color: white;
+  border: none;
+}
+
+/* 按鈕 */
+.btn {
+  border-radius: 6px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.btn-primary {
+  background: linear-gradient(
+    135deg,
+    var(--primary-color) 0%,
+    var(--secondary-color) 100%
+  );
+  border: none;
+}
+
+.btn-primary:hover,
+.btn-primary:active,
+.btn-primary:focus {
+  background: linear-gradient(135deg, #5568d3 0%, #6b3f92 100%);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.btn-outline-primary:hover {
+  background: linear-gradient(
+    135deg,
+    var(--primary-color) 0%,
+    var(--secondary-color) 100%
+  );
+  color: white;
+}
+
+/* 表單元素 */
+.form-control,
+.form-select {
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  transition: all 0.3s ease;
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+}
+
+.form-control.is-invalid,
+.form-select.is-invalid {
+  border-color: var(--danger-color);
+  box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+}
+
+/* 警告框 */
+.alert {
+  border-radius: 8px;
+  border: none;
+}
+
+.alert-success {
+  background: linear-gradient(
+    135deg,
+    rgba(40, 167, 69, 0.1) 0%,
+    rgba(40, 167, 69, 0.05) 100%
+  );
+  color: #155724;
+}
+
+.alert-danger {
+  background: linear-gradient(
+    135deg,
+    rgba(220, 53, 69, 0.1) 0%,
+    rgba(220, 53, 69, 0.05) 100%
+  );
+  color: #721c24;
+}
+
+.alert-warning {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 193, 7, 0.1) 0%,
+    rgba(255, 193, 7, 0.05) 100%
+  );
+  color: #856404;
+}
+
+.alert-info {
+  background: linear-gradient(
+    135deg,
+    rgba(23, 162, 184, 0.1) 0%,
+    rgba(23, 162, 184, 0.05) 100%
+  );
+  color: #0c5460;
+}
+
+/* 徽章 */
+.badge {
+  padding: 0.4em 0.6em;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+/* 表格 */
+.table {
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.table thead th {
+  background-color: var(--light-bg);
+  border-bottom: 2px solid #ddd;
+  font-weight: 600;
+  padding: 12px;
+}
+
+.table tbody tr {
+  transition: all 0.2s ease;
+}
+
+.table tbody tr:hover {
+  background-color: #f5f5f5;
+}
+
+.table-wrapper {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* 表單區塊 */
+.form-section {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+}
+
+.question-block {
+  background: #f9f9f9;
+  border-left: 4px solid var(--primary-color);
+  padding: 15px;
+  margin-bottom: 15px;
+  border-radius: 4px;
+}
+
+.question-block h5 {
+  margin-bottom: 10px;
+  color: #333;
+  font-weight: 600;
+}
+
+.question-item {
+  border-left: 4px solid var(--primary-color);
+}
+
+.question-item .card-body {
+  padding: 15px;
+}
+
+.option-item {
+  margin-bottom: 10px;
+}
+
+/* 進度條 */
+.progress {
+  height: 24px;
+  border-radius: 4px;
+  background-color: #e9ecef;
+}
+
+.progress-bar {
+  background: linear-gradient(
+    90deg,
+    var(--primary-color) 0%,
+    var(--secondary-color) 100%
+  );
+}
+
+/* 分頁 */
+.pagination .page-link {
+  border-radius: 4px;
+  margin: 0 2px;
+  color: var(--primary-color);
+  border: 1px solid #ddd;
+}
+
+.pagination .page-link:hover {
+  background-color: var(--light-bg);
+  color: var(--primary-color);
+}
+
+.pagination .page-item.active .page-link {
+  background: linear-gradient(
+    135deg,
+    var(--primary-color) 0%,
+    var(--secondary-color) 100%
+  );
+  border: none;
+}
+
+/* 頁腳 */
+footer {
+  margin-top: 50px;
+  border-top: 1px solid #ddd;
+  background-color: #2c3e50;
+}
+
+footer p {
+  margin: 0;
+}
+
+/* 響應式設計 */
+@media (max-width: 768px) {
+  .jumbotron h1 {
+    font-size: 2rem;
+  }
+
+  .card {
+    margin-bottom: 15px;
+  }
+
+  .btn-group {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .btn-group .btn {
+    border-radius: 4px;
+    margin-bottom: 5px;
+  }
+}
+
+/* 動畫 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.form-section,
+.card {
+  animation: fadeIn 0.3s ease;
+}
+
+/* 表單驗證反饋 */
+.invalid-feedback {
+  color: var(--danger-color);
+  font-size: 0.875rem;
+  margin-top: 5px;
+}
+
+.valid-feedback {
+  color: var(--success-color);
+  font-size: 0.875rem;
+  margin-top: 5px;
+}
+
+/* DataTables 自定義 */
+.dataTables_wrapper .dataTables_length,
+.dataTables_wrapper .dataTables_filter {
+  margin-bottom: 15px;
+}
+
+.dataTables_wrapper .dataTables_paginate {
+  margin-top: 15px;
+}
+
+/* 特殊元素 */
+.jumbotron {
+  border-radius: 12px;
+  margin-bottom: 30px;
+}
+
+.breadcrumb {
+  background-color: transparent;
+  padding: 0;
+  margin-bottom: 20px;
+}
+
+.breadcrumb-item.active {
+  color: #6c757d;
+}
+
+/* 無效狀態 */
+.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 成功狀態 */
+.success-state {
+  color: var(--success-color);
+}
+
+.error-state {
+  color: var(--danger-color);
+}
+
+/* 圖表容器 */
+canvas {
+  max-width: 100%;
+  margin: 20px 0;
+}
+
+/* 下拉菜單 */
+.dropdown-menu {
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.dropdown-item:hover {
+  background-color: var(--light-bg);
+  color: var(--primary-color);
+}
+
+/* 模態框 */
+.modal-content {
+  border-radius: 8px;
+  border: none;
+}
+
+.modal-header {
+  background-color: var(--light-bg);
+  border-bottom: 1px solid #ddd;
+}
+
+/* 手風琴 */
+.accordion-button:not(.collapsed) {
+  background-color: var(--light-bg);
+  color: var(--primary-color);
+  border-bottom-color: var(--light-bg);
+}
+
+.accordion-button:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 0.25rem rgba(102, 126, 234, 0.25);
+}

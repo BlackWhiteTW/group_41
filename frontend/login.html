@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>登入 | 社團表單系統</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@500;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="assets/css/app.css" />
+  </head>
+  <body>
+    <main class="form-page">
+      <section class="form-card fade-up">
+        <a href="index.html" class="muted">← 回首頁</a>
+        <h2>登入帳號</h2>
+        <p class="muted">這是純 HTML 示範，先做前端驗證流程。</p>
+
+        <form id="loginForm">
+          <div data-role="result"></div>
+          <div class="field">
+            <label for="username">帳號</label>
+            <input
+              id="username"
+              name="username"
+              required
+              placeholder="請輸入帳號"
+            />
+            <div class="error"></div>
+          </div>
+          <div class="field">
+            <label for="password">密碼</label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              required
+              placeholder="請輸入密碼"
+            />
+            <div class="error"></div>
+          </div>
+          <button class="btn btn-primary" style="width: 100%" type="submit">
+            登入
+          </button>
+        </form>
+
+        <p class="muted" style="margin-top: 12px">
+          沒有帳號？<a href="register.html"><strong>前往註冊</strong></a>
+        </p>
+      </section>
+    </main>
+    <script src="assets/js/app.js"></script>
+  </body>
+</html>

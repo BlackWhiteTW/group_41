@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>註冊 | 社團表單系統</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@500;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="assets/css/app.css" />
+  </head>
+  <body>
+    <main class="form-page">
+      <section class="form-card fade-up">
+        <a href="index.html" class="muted">← 回首頁</a>
+        <h2>建立帳號</h2>
+        <p class="muted">可選擇加入既有社團或建立新社團。</p>
+
+        <form id="registerForm">
+          <div data-role="result"></div>
+
+          <div class="field">
+            <label for="reg_username">帳號</label>
+            <input
+              id="reg_username"
+              name="username"
+              required
+              minlength="3"
+              placeholder="至少 3 個字"
+            />
+            <div class="error"></div>
+          </div>
+
+          <div class="field">
+            <label for="reg_email">電子郵件</label>
+            <input
+              id="reg_email"
+              name="email"
+              type="email"
+              required
+              placeholder="example@school.edu"
+            />
+            <div class="error"></div>
+          </div>
+
+          <div class="field">
+            <label>社團設定</label>
+            <label
+              ><input
+                type="radio"
+                id="club_mode_existing"
+                name="club_mode"
+                value="existing"
+                checked
+              />
+              加入既有社團</label
+            >
+            <label
+              ><input
+                type="radio"
+                id="club_mode_new"
+                name="club_mode"
+                value="new"
+              />
+              建立新社團</label
+            >
+          </div>
+
+          <div class="field" id="existingClubWrap">
+            <label for="existing_club">選擇社團</label>
+            <select id="existing_club" required>
+              <option value="">請選擇</option>
+              <option value="資訊研習社">資訊研習社</option>
+              <option value="熱音社">熱音社</option>
+              <option value="攝影社">攝影社</option>
+            </select>
+            <div class="error"></div>
+          </div>
+
+          <div class="field" id="newClubWrap" style="display: none">
+            <label for="new_club_name">新社團名稱</label>
+            <input id="new_club_name" placeholder="例如：資工系學會" />
+            <div class="error"></div>
+          </div>
+
+          <div class="field">
+            <label for="reg_password">密碼</label>
+            <input
+              id="reg_password"
+              name="password"
+              type="password"
+              required
+              minlength="6"
+              placeholder="至少 6 個字"
+            />
+            <div class="error"></div>
+          </div>
+
+          <button class="btn btn-primary" style="width: 100%" type="submit">
+            註冊
+          </button>
+        </form>
+      </section>
+    </main>
+    <script src="assets/js/app.js"></script>
+  </body>
+</html>
