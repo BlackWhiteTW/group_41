@@ -1,32 +1,21 @@
 <?php
-include_once $_SERVER['DOCUMENT_ROOT'] . '/group_41/includes/db.php';
-
 header('Content-Type: application/json; charset=utf-8');
+require __DIR__ . '/../includes/db.php';
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    echo json_encode(['error' => '只支持POST請求']);
+$q = isset($_GET['q']) ? trim($_GET['q']) : '';
+if ($q === '') {
+    echo json_encode(['available' => false, 'message' => '缺少查詢參數'], JSON_UNESCAPED_UNICODE);
     exit();
 }
 
-$username = $_POST['username'] ?? '';
+$pdo = get_db();
+$stmt = $pdo->prepare('SELECT id FROM users WHERE username = :u LIMIT 1');
+$stmt->execute([':u' => $q]);
+$exists = $stmt->fetch();
 
-if (empty($username) || strlen($username) < 3) {
-    echo json_encode(['available' => false, 'message' => '帳號至少需要3個字符']);
-    exit();
+if ($exists) {
+    echo json_encode(['available' => false, 'message' => '帳號已存在'], JSON_UNESCAPED_UNICODE);
+} else {
+    echo json_encode(['available' => true, 'message' => '可使用'], JSON_UNESCAPED_UNICODE);
 }
-
-try {
-    $sql = "SELECT id FROM users WHERE username = ?";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([$username]);
-    
-    if ($stmt->fetch()) {
-        echo json_encode(['available' => false, 'message' => '該帳號已被使用']);
-    } else {
-        echo json_encode(['available' => true, 'message' => '帳號可用']);
-    }
-} catch (Exception $e) {
-    echo json_encode(['available' => false, 'message' => '檢查失敗，請稍後重試']);
-}
-?>
-
+exit();

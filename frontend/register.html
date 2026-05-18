@@ -10,7 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@500;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="assets/css/app.css" />
+    <link rel="stylesheet" href="/group_41/css/app.css" />
   </head>
   <body>
     <main class="form-page">
@@ -71,7 +71,7 @@
 
           <div class="field" id="existingClubWrap">
             <label for="existing_club">選擇社團</label>
-            <select id="existing_club" required>
+            <select id="existing_club" name="existing_club" required>
               <option value="">請選擇</option>
               <option value="資訊研習社">資訊研習社</option>
               <option value="熱音社">熱音社</option>
@@ -82,7 +82,11 @@
 
           <div class="field" id="newClubWrap" style="display: none">
             <label for="new_club_name">新社團名稱</label>
-            <input id="new_club_name" placeholder="例如：資工系學會" />
+            <input
+              id="new_club_name"
+              name="new_club_name"
+              placeholder="例如：資工系學會"
+            />
             <div class="error"></div>
           </div>
 
@@ -99,12 +103,25 @@
             <div class="error"></div>
           </div>
 
+          <div class="field">
+            <label for="reg_password_confirm">確認密碼</label>
+            <input
+              id="reg_password_confirm"
+              name="password_confirm"
+              type="password"
+              required
+              minlength="6"
+              placeholder="請再次輸入密碼"
+            />
+            <div class="error"></div>
+          </div>
+
           <button class="btn btn-primary" style="width: 100%" type="submit">
             註冊
           </button>
         </form>
       </section>
     </main>
-    <script src="assets/js/app.js"></script>
+    <script src="/group_41/js/app.js"></script>
   </body>
 </html>

@@ -10,11 +10,8 @@ $current_user = get_current_user_info();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>社團表單系統</title>
-    <!-- Bootstrap 5 CSS -->
     <link href="/group_41/css/bootstrap.min.css" rel="stylesheet">
-    <!-- DataTables CSS -->
     <link href="/group_41/css/datatables.min.css" rel="stylesheet">
-    <!-- Custom CSS -->
     <link href="/group_41/css/style.css" rel="stylesheet">
     <style>
         body {

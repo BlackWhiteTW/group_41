@@ -1,51 +1,60 @@
 <?php
-include_once $_SERVER['DOCUMENT_ROOT'] . '/group_41/includes/header.php';
+session_start();
 
-$form_id = $_GET['form_id'] ?? 0;
-
-if (!$form_id) {
-    header('Location: /group_41/index.php');
-    exit();
-}
-
-try {
-    $sql = "SELECT title FROM forms WHERE id = ?";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([$form_id]);
-    $form = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if (!$form) {
-        header('Location: /group_41/index.php');
-        exit();
-    }
-} catch (Exception $e) {
-    header('Location: /group_41/index.php');
-    exit();
-}
+$user = !empty($_SESSION['user']) ? htmlspecialchars($_SESSION['user']) : null;
+$submission_id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 ?>
+<!doctype html>
+<html lang="zh-Hant">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>送出成功 | 社團表單系統</title>
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700&display=swap"
+			rel="stylesheet"
+		/>
+		<link rel="stylesheet" href="/group_41/css/app.css" />
+	</head>
+	<body>
+		<header class="topbar">
+			<div class="container nav">
+				<a href="/group_41/index.php" class="brand">Club Form Studio</a>
+				<nav class="menu">
+					<a class="link-btn" href="/group_41/forms/list.php">表單列表</a>
+					<a class="link-btn" href="/group_41/forms/create.php">新增表單</a>
+					<?php if ($user) : ?>
+						<a class="btn btn-primary" href="/group_41/logout.php">登出</a>
+					<?php else : ?>
+						<a class="link-btn" href="/group_41/login.php">登入</a>
+						<a class="btn btn-primary" href="/group_41/register.php">註冊</a>
+					<?php endif; ?>
+				</nav>
+			</div>
+		</header>
 
-<div class="row justify-content-center mt-5">
-    <div class="col-md-6 text-center">
-        <div class="card border-success">
-            <div class="card-body p-5">
-                <div style="font-size: 4rem; margin-bottom: 20px;">✓</div>
-                <h2 class="card-title text-success mb-3">感謝您填寫表單</h2>
-                <p class="card-text mb-4">
-                    您已成功提交「<strong><?php echo escape($form['title']); ?></strong>」<br>
-                    感謝您的參與！
-                </p>
-                <div class="d-flex gap-2 justify-content-center">
-                    <a href="/group_41/index.php" class="btn btn-primary">
-                        返回首頁
-                    </a>
-                    <a href="/group_41/forms/list.php" class="btn btn-outline-primary">
-                        查看其他表單
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+		<main class="section">
+			<div class="container">
+				<h1>送出成功</h1>
+				<div class="panel" style="padding: 20px">
+					<p class="muted">你的表單已成功送出。</p>
+					<?php if ($submission_id) : ?>
+						<p class="muted">送出編號：<?php echo $submission_id; ?></p>
+					<?php endif; ?>
+					<div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap">
+						<a class="btn btn-primary" href="/group_41/forms/list.php">返回表單列表</a>
+						<a class="btn btn-ghost" href="/group_41/index.php">回首頁</a>
+					</div>
+				</div>
+			</div>
+		</main>
 
-<?php include_once $_SERVER['DOCUMENT_ROOT'] . '/group_41/includes/footer.php'; ?>
+		<footer class="footer container">社團表單系統</footer>
+		<script src="/group_41/js/app.js"></script>
+	</body>
+</html>
 
+<?php
+exit();

@@ -1,26 +1,28 @@
 <!doctype html>
+<!-- saved from url=(0079)https://webcourse.ncue.edu.tw/Web/final_project_v1/group_41/frontend/index.html -->
 <html lang="zh-Hant">
   <head>
-    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>社團表單系統 | HTML 前端版</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://fonts.googleapis.com/" />
+    <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin="" />
     <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@500;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="assets/css/app.css" />
+    <link rel="stylesheet" href="/group_41/css/app.css" />
   </head>
   <body>
     <header class="topbar">
       <div class="container nav">
-        <a href="index.html" class="brand">Club Form Studio</a>
+        <a href="./index.html" class="brand">Club Form Studio</a>
         <nav class="menu">
-          <a class="link-btn" href="dashboard.html">儀表板</a>
-          <a class="link-btn" href="forms-view.html">填寫表單</a>
-          <a class="link-btn" href="login.html">登入</a>
-          <a class="btn btn-primary" href="register.html">註冊</a>
+          <a class="link-btn" href="./form-list.html">表單列表</a>
+          <a class="link-btn" href="./form-create.html">新增表單</a>
+          <a class="link-btn" href="./login.html">登入</a>
+          <a class="btn btn-primary" href="./register.html">註冊</a>
         </nav>
       </div>
     </header>
@@ -43,10 +45,10 @@
                 margin-top: 14px;
               "
             >
-              <a class="btn btn-primary" href="forms-view.html"
-                >立即填一份表單</a
+              <a class="btn btn-primary" href="./form-list.html"
+                >查看表單列表</a
               >
-              <a class="btn btn-ghost" href="dashboard.html">看統計面板</a>
+              <a class="btn btn-ghost" href="./form-create.html">建立新表單</a>
             </div>
           </article>
 
@@ -73,15 +75,59 @@
           <p class="muted">
             以下資料為示意 mock data，可直接改成你的真實內容。
           </p>
-          <div id="public-form-list" class="card-grid"></div>
+          <div id="public-form-list" class="card-grid">
+            <article
+              class="panel form-preview fade-up"
+              style="animation-delay: 0ms"
+            >
+              <span class="pill">公開表單</span>
+              <h3>迎新活動滿意度調查</h3>
+              <p class="muted">協助我們優化迎新流程，填答約 2 分鐘。</p>
+              <p class="meta">
+                出題者：學生會 ・ 填寫數：123 ・ 建立日：2026-03-14
+              </p>
+              <div
+                style="
+                  margin-top: 12px;
+                  display: flex;
+                  gap: 8px;
+                  flex-wrap: wrap;
+                "
+              >
+                <a class="btn btn-primary" href="./form-list.html">查看列表</a>
+                <a class="btn btn-ghost" href="./form-create.html">新增表單</a>
+              </div>
+            </article>
+
+            <article
+              class="panel form-preview fade-up"
+              style="animation-delay: 80ms"
+            >
+              <span class="pill">公開表單</span>
+              <h3>社課設備需求調查</h3>
+              <p class="muted">統計社課設備缺口，作為下學期預算依據。</p>
+              <p class="meta">
+                出題者：熱音社 ・ 填寫數：57 ・ 建立日：2026-03-20
+              </p>
+              <div
+                style="
+                  margin-top: 12px;
+                  display: flex;
+                  gap: 8px;
+                  flex-wrap: wrap;
+                "
+              >
+                <a class="btn btn-primary" href="./form-list.html">查看列表</a>
+                <a class="btn btn-ghost" href="./form-create.html">新增表單</a>
+              </div>
+            </article>
+          </div>
         </div>
       </section>
     </main>
 
-    <footer class="footer container">
-      社團表單系統 HTML 版 ・ 可再接回 PHP API
-    </footer>
+    <footer class="footer container">社團表單系統第一版靜態展示</footer>
 
-    <script src="assets/js/app.js"></script>
+    <script src="/group_41/js/app.js"></script>
   </body>
 </html>

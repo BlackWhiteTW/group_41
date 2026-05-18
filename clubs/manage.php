@@ -1,330 +1,244 @@
 <?php
-include_once $_SERVER['DOCUMENT_ROOT'] . '/group_41/includes/header.php';
+session_start();
+require __DIR__ . '/../includes/db.php';
 
-if (!is_logged_in()) {
-    redirect_to_login();
+$user_raw = isset($_SESSION['user']) ? $_SESSION['user'] : null;
+$user = !empty($user_raw) ? htmlspecialchars($user_raw) : null;
+$errors = [];
+$current_user = null;
+$is_admin = false;
+
+$clubs = [];
+$club = null;
+$members = [];
+$officers = [];
+$public_forms = [];
+$private_forms = [];
+
+$selected_id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+
+if (!$user_raw) {
+	header('Location: /group_41/login.php');
+	exit;
 }
-
-if (!in_array($current_user['role'], ['club_officer', 'admin'])) {
-    redirect_to_login();
-}
-
-$success = '';
-$error = '';
-$is_admin = ($current_user['role'] === 'admin');
-$managed_club = null;
-$clubs_for_admin = [];
 
 try {
-    if ($is_admin) {
-        $sql = "SELECT c.id, c.name, c.owner_user_id, u.username AS owner_username
-                FROM clubs c
-                LEFT JOIN users u ON c.owner_user_id = u.id
-                ORDER BY c.name ASC";
-        $stmt = $pdo->query($sql);
-        $clubs_for_admin = $stmt->fetchAll(PDO::FETCH_ASSOC);
+	$pdo = get_db();
+	$user_stmt = $pdo->prepare('SELECT id, username, role, club_category FROM users WHERE username = :u LIMIT 1');
+	$user_stmt->execute([':u' => $user_raw]);
+	$current_user = $user_stmt->fetch();
+	if (!$current_user) {
+		$errors[] = '找不到登入帳號資料。';
+	} else {
+		$is_admin = ($current_user['role'] === 'admin');
+	}
 
-        $selected_club_id = (int)($_GET['club_id'] ?? 0);
-        if ($selected_club_id <= 0 && !empty($clubs_for_admin)) {
-            $selected_club_id = (int)$clubs_for_admin[0]['id'];
-        }
+	if (empty($errors)) {
+		if ($is_admin) {
+			$clubs = $pdo->query('SELECT c.id, c.name, u.username AS owner_name FROM clubs c JOIN users u ON u.id = c.owner_user_id ORDER BY c.name ASC')->fetchAll();
+		} else {
+			$allowed_clubs = [];
+			if (!empty($current_user['club_category'])) {
+				$allowed_clubs[] = $current_user['club_category'];
+			}
+			$owned_stmt = $pdo->prepare('SELECT name FROM clubs WHERE owner_user_id = :id');
+			$owned_stmt->execute([':id' => $current_user['id']]);
+			$owned_names = array_column($owned_stmt->fetchAll(), 'name');
+			$allowed_clubs = array_values(array_unique(array_merge($allowed_clubs, $owned_names)));
 
-        foreach ($clubs_for_admin as $club_item) {
-            if ((int)$club_item['id'] === $selected_club_id) {
-                $managed_club = $club_item;
-                break;
-            }
-        }
-    } else {
-        $sql = "SELECT c.id, c.name, c.owner_user_id, u.username AS owner_username
-                FROM clubs c
-                LEFT JOIN users u ON c.owner_user_id = u.id
-                WHERE c.owner_user_id = ?
-                LIMIT 1";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([$current_user['id']]);
-        $managed_club = $stmt->fetch(PDO::FETCH_ASSOC);
-    }
-} catch (Exception $e) {
-    $managed_club = null;
+			if (!empty($allowed_clubs)) {
+				$placeholders = implode(',', array_fill(0, count($allowed_clubs), '?'));
+				$club_stmt = $pdo->prepare("SELECT c.id, c.name, u.username AS owner_name FROM clubs c JOIN users u ON u.id = c.owner_user_id WHERE c.name IN ($placeholders) ORDER BY c.name ASC");
+				$club_stmt->execute($allowed_clubs);
+				$clubs = $club_stmt->fetchAll();
+			}
+		}
+	}
+
+	if (empty($clubs)) {
+		$errors[] = $is_admin ? '尚未建立任何社團。' : '你尚未加入任何社團。';
+	} else {
+		if ($selected_id === 0) {
+			$selected_id = (int) $clubs[0]['id'];
+		} else {
+			$allowed_ids = array_map('intval', array_column($clubs, 'id'));
+			if (!in_array($selected_id, $allowed_ids, true)) {
+				$selected_id = (int) $clubs[0]['id'];
+			}
+		}
+		$stmt = $pdo->prepare('SELECT c.id, c.name, c.owner_user_id, u.username AS owner_name, u.email AS owner_email FROM clubs c JOIN users u ON u.id = c.owner_user_id WHERE c.id = :id LIMIT 1');
+		$stmt->execute([':id' => $selected_id]);
+		$club = $stmt->fetch();
+		if (!$club) {
+			$errors[] = '找不到指定的社團。';
+		} else {
+			$member_stmt = $pdo->prepare('SELECT username, email, role FROM users WHERE club_category = :club ORDER BY role DESC, username ASC');
+			$member_stmt->execute([':club' => $club['name']]);
+			$members_all = $member_stmt->fetchAll();
+			foreach ($members_all as $member) {
+				if ($member['role'] === 'club_officer') {
+					$officers[] = $member;
+				} elseif ($member['role'] === 'member') {
+					$members[] = $member;
+				}
+			}
+
+			$form_stmt = $pdo->prepare('SELECT f.id, f.title, f.form_type, f.status, f.created_at, u.username FROM forms f JOIN users u ON u.id = f.creator_id WHERE u.club_category = :club ORDER BY f.created_at DESC');
+			$form_stmt->execute([':club' => $club['name']]);
+			$forms = $form_stmt->fetchAll();
+			foreach ($forms as $form) {
+				if ($form['form_type'] === 'public') {
+					$public_forms[] = $form;
+				} else {
+					$private_forms[] = $form;
+				}
+			}
+		}
+	}
+} catch (Throwable $e) {
+	$errors[] = '資料庫讀取失敗，請稍後再試。';
 }
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = $_POST['action'] ?? '';
-    $token = $_POST['csrf_token'] ?? '';
-    $target_user_id = (int)($_POST['target_user_id'] ?? 0);
-    $club_id = (int)($_POST['club_id'] ?? 0);
-
-    $action_club = null;
-    if ($club_id > 0) {
-        try {
-            $sql = "SELECT c.id, c.name, c.owner_user_id, u.username AS owner_username
-                    FROM clubs c
-                    LEFT JOIN users u ON c.owner_user_id = u.id
-                    WHERE c.id = ?
-                    LIMIT 1";
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute([$club_id]);
-            $action_club = $stmt->fetch(PDO::FETCH_ASSOC);
-        } catch (Exception $e) {
-            $action_club = null;
-        }
-    }
-
-    if (!verify_csrf_token($token)) {
-        $error = '表單已過期，請重新整理再試一次';
-    } elseif (!$action_club) {
-        $error = '找不到指定社團';
-    } elseif (!$is_admin && (int)$action_club['owner_user_id'] !== (int)$current_user['id']) {
-        $error = '你不是此社團擁有者，無法執行此操作';
-    } elseif (!$target_user_id) {
-        $error = '無效的目標用戶';
-    } else {
-        try {
-            $pdo->beginTransaction();
-
-            $sql = "SELECT id, username, role, club_category FROM users WHERE id = ? FOR UPDATE";
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute([$target_user_id]);
-            $target_user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            if (!$target_user) {
-                throw new Exception('找不到目標用戶');
-            }
-
-            if ($target_user['club_category'] !== $action_club['name']) {
-                throw new Exception('只能管理同社團成員');
-            }
-
-            if ((int)$action_club['owner_user_id'] === (int)$target_user['id'] && $action !== 'transfer_owner') {
-                throw new Exception('社團擁有者無法被升降職');
-            }
-
-            if ($target_user['role'] === 'admin') {
-                throw new Exception('系統管理員不可在此頁面調整身份');
-            }
-
-            if ($action === 'promote_officer') {
-                $sql = "UPDATE users SET role = 'club_officer' WHERE id = ?";
-                $stmt = $pdo->prepare($sql);
-                $stmt->execute([$target_user_id]);
-                $success = '已將 ' . $target_user['username'] . ' 設為社團幹部';
-            } elseif ($action === 'demote_member') {
-                $sql = "UPDATE users SET role = 'member' WHERE id = ?";
-                $stmt = $pdo->prepare($sql);
-                $stmt->execute([$target_user_id]);
-                $success = '已將 ' . $target_user['username'] . ' 調整為成員';
-            } elseif ($action === 'transfer_owner') {
-                if ((int)$target_user['id'] === (int)$action_club['owner_user_id']) {
-                    throw new Exception('該用戶已是社團擁有者');
-                }
-
-                $sql = "UPDATE users SET role = 'club_officer' WHERE id = ?";
-                $stmt = $pdo->prepare($sql);
-                $stmt->execute([$target_user_id]);
-
-                $sql = "UPDATE clubs SET owner_user_id = ? WHERE id = ?";
-                $stmt = $pdo->prepare($sql);
-                $stmt->execute([$target_user_id, $action_club['id']]);
-
-                $action_club['owner_user_id'] = $target_user_id;
-                $success = '已將社團擁有者移轉給 ' . $target_user['username'];
-            } else {
-                throw new Exception('未知操作');
-            }
-
-            $pdo->commit();
-
-            $redirect = '/group_41/clubs/manage.php';
-            if ($is_admin) {
-                $redirect .= '?club_id=' . (int)$action_club['id'];
-                if ($action === 'transfer_owner') {
-                    $redirect .= '&transferred=1';
-                }
-            } elseif ($action === 'transfer_owner') {
-                $redirect .= '?transferred=1';
-            }
-            header('Location: ' . $redirect);
-            exit();
-        } catch (Exception $e) {
-            if ($pdo->inTransaction()) {
-                $pdo->rollBack();
-            }
-            $error = $e->getMessage();
-        }
-    }
-}
-
-if (isset($_GET['transferred']) && $_GET['transferred'] == '1') {
-    $success = '你已完成社團擁有者移轉，管理權限已更新';
-}
-
-$members = [];
-if ($managed_club) {
-    try {
-        $sql = "SELECT id, username, email, role, created_at
-                FROM users
-                WHERE club_category = ?
-                ORDER BY FIELD(role, 'admin', 'club_officer', 'member', 'guest'), created_at ASC";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([$managed_club['name']]);
-        $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Exception $e) {
-        $members = [];
-    }
-}
-
-$csrf_token = generate_csrf_token();
 ?>
+<!doctype html>
+<html lang="zh-Hant">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>社團資訊 | 社團表單系統</title>
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700&display=swap"
+			rel="stylesheet"
+		/>
+		<link rel="stylesheet" href="/group_41/css/app.css" />
+	</head>
+	<body>
+		<header class="topbar">
+			<div class="container nav">
+				<a href="/group_41/index.php" class="brand">Club Form Studio</a>
+				<nav class="menu">
+					<a class="link-btn" href="/group_41/index.php">首頁</a>
+					<a class="link-btn" href="/group_41/forms/list.php">表單列表</a>
+					<a class="link-btn" href="/group_41/forms/create.php">新增表單</a>
+					<?php if ($user) : ?>
+						<a class="btn btn-primary" href="/group_41/logout.php">登出</a>
+					<?php else : ?>
+						<a class="link-btn" href="/group_41/login.php">登入</a>
+						<a class="btn btn-primary" href="/group_41/register.php">註冊</a>
+					<?php endif; ?>
+				</nav>
+			</div>
+		</header>
 
-<h2 class="mb-4">🏷️ 社團管理</h2>
+		<main class="section">
+			<div class="container">
+				<h1>社團資訊</h1>
+				<p class="muted">查看社團成員、幹部與社團表單資訊。</p>
+				<?php if (!empty($errors)) : ?>
+					<div class="error">
+						<ul>
+							<?php foreach ($errors as $e) : ?>
+								<li><?php echo htmlspecialchars($e); ?></li>
+							<?php endforeach; ?>
+						</ul>
+					</div>
+				<?php else : ?>
+					<div style="display: grid; gap: 20px; grid-template-columns: minmax(220px, 1fr) minmax(0, 3fr)">
+						<div class="panel" style="padding: 16px">
+							<h3>社團清單</h3>
+							<div style="display: grid; gap: 10px; margin-top: 12px">
+								<?php foreach ($clubs as $item) : ?>
+									<?php $active = ($club && $club['id'] == $item['id']); ?>
+									<a
+										href="/group_41/clubs/manage.php?id=<?php echo (int) $item['id']; ?>"
+										class="panel"
+										style="padding: 12px; border-color: <?php echo $active ? '#8bc9b4' : '#e0e9e3'; ?>; background: <?php echo $active ? '#eef7f3' : 'rgba(255,255,255,0.9)'; ?>"
+									>
+										<strong><?php echo htmlspecialchars($item['name']); ?></strong>
+										<p class="muted" style="margin-top: 4px">擁有人：<?php echo htmlspecialchars($item['owner_name']); ?></p>
+									</a>
+								<?php endforeach; ?>
+							</div>
+						</div>
 
-<?php if ($success): ?>
-    <div class="alert alert-success alert-dismissible fade show" role="alert">
-        <?php echo escape($success); ?>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-<?php endif; ?>
+						<div style="display: grid; gap: 16px">
+							<div class="panel" style="padding: 20px">
+								<h2><?php echo htmlspecialchars($club['name']); ?></h2>
+								<p class="meta">擁有人：<?php echo htmlspecialchars($club['owner_name']); ?><?php echo $club['owner_email'] ? ' ・ ' . htmlspecialchars($club['owner_email']) : ''; ?></p>
+								<div style="display: flex; gap: 16px; flex-wrap: wrap; margin-top: 12px">
+									<span class="pill">幹部：<?php echo number_format(count($officers)); ?></span>
+									<span class="pill">成員：<?php echo number_format(count($members)); ?></span>
+									<span class="pill">公開表單：<?php echo number_format(count($public_forms)); ?></span>
+									<span class="pill">非公開表單：<?php echo number_format(count($private_forms)); ?></span>
+								</div>
+							</div>
 
-<?php if ($error): ?>
-    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-        <?php echo escape($error); ?>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-<?php endif; ?>
+							<div class="panel" style="padding: 20px">
+								<h3>幹部人員</h3>
+								<?php if (empty($officers)) : ?>
+									<p class="muted">尚未設定幹部。</p>
+								<?php else : ?>
+									<ul>
+										<?php foreach ($officers as $officer) : ?>
+											<li><?php echo htmlspecialchars($officer['username']); ?><?php echo $officer['email'] ? ' ・ ' . htmlspecialchars($officer['email']) : ''; ?></li>
+										<?php endforeach; ?>
+									</ul>
+								<?php endif; ?>
+							</div>
 
-<?php if ($is_admin && !empty($clubs_for_admin)): ?>
-    <div class="card mb-4">
-        <div class="card-body">
-            <form method="GET" class="row g-2 align-items-end">
-                <div class="col-md-6">
-                    <label for="club_id" class="form-label">管理社團</label>
-                    <select class="form-select" id="club_id" name="club_id" onchange="this.form.submit()">
-                        <?php foreach ($clubs_for_admin as $club_item): ?>
-                            <option value="<?php echo (int)$club_item['id']; ?>" <?php echo ($managed_club && (int)$managed_club['id'] === (int)$club_item['id']) ? 'selected' : ''; ?>>
-                                <?php echo escape($club_item['name']); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="col-md-6 text-muted small">
-                    管理員可切換並操作所有社團。
-                </div>
-            </form>
-        </div>
-    </div>
-<?php endif; ?>
+							<div class="panel" style="padding: 20px">
+								<h3>成員</h3>
+								<?php if (empty($members)) : ?>
+									<p class="muted">尚未設定成員。</p>
+								<?php else : ?>
+									<ul>
+										<?php foreach ($members as $member) : ?>
+											<li><?php echo htmlspecialchars($member['username']); ?><?php echo $member['email'] ? ' ・ ' . htmlspecialchars($member['email']) : ''; ?></li>
+										<?php endforeach; ?>
+									</ul>
+								<?php endif; ?>
+							</div>
 
-<?php if (!$managed_club): ?>
-    <div class="alert alert-warning" role="alert">
-        <?php if ($is_admin): ?>
-            目前沒有可管理的社團。
-        <?php else: ?>
-            目前你不是任何社團的擁有者，因此無法管理幹部身份。
-        <?php endif; ?>
-    </div>
-<?php else: ?>
-    <div class="card mb-4">
-        <div class="card-body">
-            <h5 class="card-title mb-2">社團資訊</h5>
-            <p class="mb-1"><strong>社團名稱：</strong><?php echo escape($managed_club['name']); ?></p>
-            <p class="mb-1"><strong>目前擁有者：</strong><?php echo escape($managed_club['owner_username'] ?? '未知'); ?></p>
-            <p class="mb-0 text-muted">
-                <?php if ($is_admin): ?>
-                    你是管理員，可操作所有社團成員的幹部身份與擁有權。
-                <?php else: ?>
-                    你是目前的社團擁有者。只有你可以升降幹部或移轉擁有權。
-                <?php endif; ?>
-            </p>
-        </div>
-    </div>
+							<div class="panel" style="padding: 20px">
+								<h3>社團表單（公開）</h3>
+								<?php if (empty($public_forms)) : ?>
+									<p class="muted">尚無公開表單。</p>
+								<?php else : ?>
+									<?php foreach ($public_forms as $form) : ?>
+										<div style="padding: 10px 0; border-bottom: 1px solid #e4efe8">
+											<strong><?php echo htmlspecialchars($form['title']); ?></strong>
+											<p class="muted">狀態：<?php echo htmlspecialchars($form['status']); ?> ・ 建立者：<?php echo htmlspecialchars($form['username']); ?></p>
+											<a class="btn btn-ghost btn-small" href="/group_41/forms/view.php?id=<?php echo (int) $form['id']; ?>">查看表單</a>
+										</div>
+									<?php endforeach; ?>
+								<?php endif; ?>
+							</div>
 
-    <div class="table-responsive">
-        <table class="table table-hover align-middle">
-            <thead class="table-light">
-                <tr>
-                    <th>帳號</th>
-                    <th>Email</th>
-                    <th>身份</th>
-                    <th>加入時間</th>
-                    <th>操作</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($members as $member): ?>
-                    <?php $is_owner = ((int)$member['id'] === (int)$managed_club['owner_user_id']); ?>
-                    <tr>
-                        <td>
-                            <strong><?php echo escape($member['username']); ?></strong>
-                            <?php if ($is_owner): ?>
-                                <span class="badge bg-danger ms-2">擁有者</span>
-                            <?php endif; ?>
-                        </td>
-                        <td><?php echo escape($member['email']); ?></td>
-                        <td>
-                            <?php if ($member['role'] === 'club_officer'): ?>
-                                <span class="badge bg-warning text-dark">社團幹部</span>
-                            <?php elseif ($member['role'] === 'member'): ?>
-                                <span class="badge bg-info text-dark">成員</span>
-                            <?php elseif ($member['role'] === 'admin'): ?>
-                                <span class="badge bg-danger">管理員</span>
-                            <?php else: ?>
-                                <span class="badge bg-secondary"><?php echo escape($member['role']); ?></span>
-                            <?php endif; ?>
-                        </td>
-                        <td><?php echo date('Y-m-d', strtotime($member['created_at'])); ?></td>
-                        <td>
-                            <?php if ($is_owner): ?>
-                                <span class="text-muted small">擁有者不可被他人修改</span>
-                            <?php elseif ($member['role'] === 'admin'): ?>
-                                <span class="text-muted small">管理員不可調整</span>
-                            <?php else: ?>
-                                <div class="d-flex gap-2">
-                                    <?php if ($member['role'] === 'member'): ?>
-                                        <form method="POST" class="d-inline">
-                                            <input type="hidden" name="csrf_token" value="<?php echo escape($csrf_token); ?>">
-                                            <input type="hidden" name="club_id" value="<?php echo (int)$managed_club['id']; ?>">
-                                            <input type="hidden" name="action" value="promote_officer">
-                                            <input type="hidden" name="target_user_id" value="<?php echo $member['id']; ?>">
-                                            <button type="submit" class="btn btn-sm btn-outline-success">升為幹部</button>
-                                        </form>
-                                    <?php elseif ($member['role'] === 'club_officer'): ?>
-                                        <form method="POST" class="d-inline">
-                                            <input type="hidden" name="csrf_token" value="<?php echo escape($csrf_token); ?>">
-                                            <input type="hidden" name="club_id" value="<?php echo (int)$managed_club['id']; ?>">
-                                            <input type="hidden" name="action" value="demote_member">
-                                            <input type="hidden" name="target_user_id" value="<?php echo $member['id']; ?>">
-                                            <button type="submit" class="btn btn-sm btn-outline-secondary">降為成員</button>
-                                        </form>
-                                    <?php endif; ?>
+							<div class="panel" style="padding: 20px">
+								<h3>社團表單（非公開）</h3>
+								<?php if (empty($private_forms)) : ?>
+									<p class="muted">尚無非公開表單。</p>
+								<?php else : ?>
+									<?php foreach ($private_forms as $form) : ?>
+										<div style="padding: 10px 0; border-bottom: 1px solid #e4efe8">
+											<strong><?php echo htmlspecialchars($form['title']); ?></strong>
+											<p class="muted">狀態：<?php echo htmlspecialchars($form['status']); ?> ・ 建立者：<?php echo htmlspecialchars($form['username']); ?></p>
+											<a class="btn btn-ghost btn-small" href="/group_41/forms/view.php?id=<?php echo (int) $form['id']; ?>">查看表單</a>
+										</div>
+									<?php endforeach; ?>
+								<?php endif; ?>
+							</div>
+						</div>
+					</div>
+				<?php endif; ?>
+			</div>
+		</main>
 
-                                    <form method="POST" class="d-inline transfer-owner-form" data-name="<?php echo escape($member['username']); ?>">
-                                        <input type="hidden" name="csrf_token" value="<?php echo escape($csrf_token); ?>">
-                                        <input type="hidden" name="club_id" value="<?php echo (int)$managed_club['id']; ?>">
-                                        <input type="hidden" name="action" value="transfer_owner">
-                                        <input type="hidden" name="target_user_id" value="<?php echo $member['id']; ?>">
-                                        <button type="submit" class="btn btn-sm btn-outline-danger">移轉擁有權</button>
-                                    </form>
-                                </div>
-                            <?php endif; ?>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-<?php endif; ?>
+		<footer class="footer container">社團表單系統</footer>
+		<script src="/group_41/js/app.js"></script>
+	</body>
+</html>
 
-<script>
-document.querySelectorAll('.transfer-owner-form').forEach(function(form) {
-    form.addEventListener('submit', function(e) {
-        const targetName = form.dataset.name || '該用戶';
-        const ok = confirm('確認要把社團擁有者移轉給「' + targetName + '」嗎？移轉後你將失去擁有者權限。');
-        if (!ok) {
-            e.preventDefault();
-        }
-    });
-});
-</script>
-
-<?php include_once $_SERVER['DOCUMENT_ROOT'] . '/group_41/includes/footer.php'; ?>
+<?php
+exit();

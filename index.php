@@ -1,153 +1,175 @@
 <?php
-include_once $_SERVER['DOCUMENT_ROOT'] . '/group_41/includes/header.php';
+session_start();
 
-// 獲取公開表單列表
-$page = max(1, (int)($_GET['page'] ?? 1));
-$per_page = 10;
-$offset = max(0, ($page - 1) * $per_page);
+require __DIR__ . '/includes/db.php';
+
+$user = !empty($_SESSION['user']) ? htmlspecialchars($_SESSION['user']) : null;
+$stats = [
+	'public_forms' => 0,
+	'submissions' => 0,
+	'clubs' => 0
+];
+$public_forms = [];
+$public_error = null;
+$flash_error = null;
+
+if (!empty($_SESSION['flash_error'])) {
+	$flash_error = $_SESSION['flash_error'];
+	unset($_SESSION['flash_error']);
+}
 
 try {
-    // 獲取公開表單
-    $sql = "SELECT f.*, u.username, COUNT(fs.id) as submission_count 
-            FROM forms f 
-            LEFT JOIN users u ON f.creator_id = u.id 
-            LEFT JOIN form_submissions fs ON f.id = fs.form_id
-            WHERE f.status = 'published' AND f.form_type = 'public'
-            GROUP BY f.id
-            ORDER BY f.created_at DESC
-            LIMIT ? OFFSET ?";
-    $stmt = $pdo->prepare($sql);
-        $stmt->bindValue(1, (int)$per_page, PDO::PARAM_INT);
-        $stmt->bindValue(2, (int)$offset, PDO::PARAM_INT);
-        $stmt->execute();
-    $forms = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    // 獲取總數
-    $sql = "SELECT COUNT(*) as total FROM forms WHERE status = 'published' AND form_type = 'public'";
-    $stmt = $pdo->query($sql);
-    $total_rows = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
-    $total_pages = ceil($total_rows / $per_page);
-} catch (Exception $e) {
-    $forms = [];
-    $total_pages = 1;
+	$pdo = get_db();
+	$stats['public_forms'] = (int) $pdo->query("SELECT COUNT(*) FROM forms WHERE form_type = 'public'")->fetchColumn();
+	$stats['submissions'] = (int) $pdo->query('SELECT COUNT(*) FROM form_submissions')->fetchColumn();
+	$stats['clubs'] = (int) $pdo->query('SELECT COUNT(*) FROM clubs')->fetchColumn();
+	$stmt = $pdo->query("SELECT f.id, f.title, f.description, f.status, f.created_at, u.username, COUNT(s.id) AS submissions FROM forms f JOIN users u ON u.id = f.creator_id LEFT JOIN form_submissions s ON s.form_id = f.id WHERE f.form_type = 'public' GROUP BY f.id ORDER BY f.created_at DESC");
+	$public_forms = $stmt->fetchAll();
+} catch (Throwable $e) {
+	$stats = [
+		'public_forms' => 0,
+		'submissions' => 0,
+		'clubs' => 0
+	];
+	$public_error = '公開表單載入失敗，請稍後再試。';
 }
 ?>
+<!doctype html>
+<html lang="zh-Hant">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>社團表單系統</title>
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700&display=swap"
+			rel="stylesheet"
+		/>
+		<link rel="stylesheet" href="/group_41/css/app.css" />
+	</head>
+	<body>
+		<header class="topbar">
+			<div class="container nav">
+				<a href="/group_41/index.php" class="brand">Club Form Studio</a>
+				<nav class="menu">
+					<a class="link-btn" href="/group_41/forms/list.php">表單列表</a>
+					<a class="link-btn" href="/group_41/forms/create.php">新增表單</a>
+					<a class="link-btn" href="/group_41/clubs/manage.php">社團資訊</a>
+					<?php if ($user) : ?>
+						<a class="btn btn-primary" href="/group_41/logout.php">登出</a>
+					<?php else : ?>
+						<a class="link-btn" href="/group_41/login.php">登入</a>
+						<a class="btn btn-primary" href="/group_41/register.php">註冊</a>
+					<?php endif; ?>
+				</nav>
+				<span class="muted">登入狀態：<?php echo $user ? '已登入：' . $user : '未登入'; ?></span>
+			</div>
+		</header>
 
-<div class="row mb-5">
-    <div class="col-md-8">
-        <div class="jumbotron bg-primary text-white p-5 rounded">
-            <h1 class="display-4">🎓 歡迎使用社團表單系統</h1>
-            <p class="lead">校內活動問卷統計平台 - 快速建立和發布活動滿意度問卷</p>
-            <hr class="my-4">
-            <p>無論您是社團幹部還是普通成員，都可以輕鬆創建表單、發起問卷調查。</p>
-            <?php if (!is_logged_in()): ?>
-                <a class="btn btn-light btn-lg" href="/group_41/login.php" role="button">
-                    登入帳號
-                </a>
-                <a class="btn btn-outline-light btn-lg ms-2" href="/group_41/register.php" role="button">
-                    註冊帳號
-                </a>
-            <?php else: ?>
-                <a class="btn btn-light btn-lg" href="/group_41/forms/list.php" role="button">
-                    瀏覽所有表單
-                </a>
-                <?php if (in_array($current_user['role'], ['club_officer', 'admin'])): ?>
-                    <a class="btn btn-outline-light btn-lg ms-2" href="/group_41/forms/create.php" role="button">
-                        建立新表單
-                    </a>
-                <?php endif; ?>
-            <?php endif; ?>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card bg-info text-white">
-            <div class="card-body">
-                <h5 class="card-title">📊 系統統計</h5>
-                <hr>
-                <p class="mb-1">
-                    <strong>總表單數：</strong> 
-                    <?php 
-                        $stmt = $pdo->query("SELECT COUNT(*) as count FROM forms");
-                        echo $stmt->fetch()['count'];
-                    ?>
-                </p>
-                <p class="mb-1">
-                    <strong>已發布表單：</strong> 
-                    <?php 
-                        $stmt = $pdo->query("SELECT COUNT(*) as count FROM forms WHERE status = 'published'");
-                        echo $stmt->fetch()['count'];
-                    ?>
-                </p>
-                <p class="mb-0">
-                    <strong>總填寫次數：</strong> 
-                    <?php 
-                        $stmt = $pdo->query("SELECT COUNT(*) as count FROM form_submissions");
-                        echo $stmt->fetch()['count'];
-                    ?>
-                </p>
-            </div>
-        </div>
-    </div>
-</div>
+		<main>
+			<?php if ($flash_error) : ?>
+				<section class="section">
+					<div class="container">
+						<div class="error"><?php echo htmlspecialchars($flash_error); ?></div>
+					</div>
+				</section>
+			<?php endif; ?>
+			<section class="hero">
+				<div class="container hero-grid">
+					<article class="hero-card fade-up">
+						<span class="badge">PHP + HTML</span>
+						<h1>
+							校園活動問卷平台<br />
+							整合前後端實作
+						</h1>
+						<p class="muted">
+							這一版整合 PHP 與資料庫，提供實際登入與表單管理流程。
+							<span>登入狀態：<?php echo $user ? '已登入：' . $user : '未登入'; ?></span>
+						</p>
+						<div
+							style="
+								display: flex;
+								gap: 10px;
+								flex-wrap: wrap;
+								margin-top: 14px;
+							"
+						>
+							<a class="btn btn-primary" href="/group_41/forms/list.php">查看表單列表</a>
+							<a class="btn btn-ghost" href="/group_41/forms/create.php">建立新表單</a>
+							<a class="btn btn-ghost" href="/group_41/clubs/manage.php">查看社團資訊</a>
+						</div>
+					</article>
 
-<h2 class="mb-4">📋 公開的表單</h2>
+					<aside class="panel stats fade-up" style="animation-delay: 120ms">
+						<div class="stat">
+							<div class="muted">公開表單</div>
+							<strong><?php echo number_format($stats['public_forms']); ?></strong>
+						</div>
+						<div class="stat">
+							<div class="muted">總填答次數</div>
+							<strong><?php echo number_format($stats['submissions']); ?></strong>
+						</div>
+						<div class="stat">
+							<div class="muted">活躍社團</div>
+							<strong><?php echo number_format($stats['clubs']); ?></strong>
+						</div>
+					</aside>
+				</div>
+			</section>
 
-<?php if (empty($forms)): ?>
-    <div class="alert alert-info">目前沒有公開的表單</div>
-<?php else: ?>
-    <div class="row">
-        <?php foreach ($forms as $form): ?>
-            <div class="col-md-6 mb-3">
-                <div class="card h-100">
-                    <div class="card-body">
-                        <h5 class="card-title">
-                            <?php echo escape($form['title']); ?>
-                        </h5>
-                        <p class="card-text text-muted small">
-                            出題者: <strong><?php echo escape($form['username']); ?></strong><br>
-                            已填寫: <strong><?php echo $form['submission_count']; ?></strong> 份
-                        </p>
-                        <?php if ($form['description']): ?>
-                            <p class="card-text">
-                                <?php echo escape(substr($form['description'], 0, 100)); ?>
-                                <?php if (strlen($form['description']) > 100): ?>...<?php endif; ?>
-                            </p>
-                        <?php endif; ?>
-                        <div class="d-flex gap-2">
-                            <a href="/group_41/forms/view.php?id=<?php echo $form['id']; ?>" 
-                                class="btn btn-sm btn-primary">查看表單</a>
-                            <?php if (is_logged_in() && in_array($current_user['role'], ['admin', 'club_officer'])): ?>
-                                <a href="/group_41/forms/statistics.php?id=<?php echo $form['id']; ?>" 
-                                    class="btn btn-sm btn-outline-info">統計結果</a>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                    <div class="card-footer text-muted small">
-                        建立於: <?php echo date('Y-m-d', strtotime($form['created_at'])); ?>
-                    </div>
-                </div>
-            </div>
-        <?php endforeach; ?>
-    </div>
-    
-    <?php if ($total_pages > 1): ?>
-        <nav aria-label="Page navigation" class="mt-5">
-            <ul class="pagination justify-content-center">
-                <li class="page-item <?php echo $page <= 1 ? 'disabled' : ''; ?>">
-                    <a class="page-link" href="?page=<?php echo $page - 1; ?>">上一頁</a>
-                </li>
-                <?php for ($i = 1; $i <= $total_pages; $i++): ?>
-                    <li class="page-item <?php echo $page == $i ? 'active' : ''; ?>">
-                        <a class="page-link" href="?page=<?php echo $i; ?>"><?php echo $i; ?></a>
-                    </li>
-                <?php endfor; ?>
-                <li class="page-item <?php echo $page >= $total_pages ? 'disabled' : ''; ?>">
-                    <a class="page-link" href="?page=<?php echo $page + 1; ?>">下一頁</a>
-                </li>
-            </ul>
-        </nav>
-    <?php endif; ?>
-<?php endif; ?>
+			<section class="section">
+				<div class="container">
+					<h2>公開表單清單</h2>
+					<p class="muted">以下為目前公開的表單。</p>
+					<?php if ($public_error) : ?>
+						<div class="error"><?php echo htmlspecialchars($public_error); ?></div>
+					<?php elseif (empty($public_forms)) : ?>
+						<div class="panel" style="padding: 20px">
+							<p class="muted">目前尚無公開表單。</p>
+							<a class="btn btn-primary" href="/group_41/forms/create.php">建立新表單</a>
+						</div>
+					<?php else : ?>
+						<div id="public-form-list" class="card-grid">
+							<?php foreach ($public_forms as $index => $form) : ?>
+								<?php
+									$created_at = !empty($form['created_at']) ? date('Y-m-d', strtotime($form['created_at'])) : '';
+									$submissions = isset($form['submissions']) ? (int) $form['submissions'] : 0;
+								?>
+								<article class="panel form-preview fade-up" style="animation-delay: <?php echo $index * 80; ?>ms">
+									<span class="pill">公開表單</span>
+									<h3><?php echo htmlspecialchars($form['title']); ?></h3>
+									<p class="muted"><?php echo htmlspecialchars($form['description'] ?: '尚未提供表單說明。'); ?></p>
+									<p class="meta">
+										出題者：<?php echo htmlspecialchars($form['username']); ?> ・ 填寫數：<?php echo number_format($submissions); ?> ・ 建立日：<?php echo htmlspecialchars($created_at); ?>
+									</p>
+									<div
+										style="
+											margin-top: 12px;
+											display: flex;
+											gap: 8px;
+											flex-wrap: wrap;
+										"
+									>
+										<a class="btn btn-primary" href="/group_41/forms/view.php?id=<?php echo (int) $form['id']; ?>">查看表單</a>
+										<?php if ($form['status'] === 'published') : ?>
+											<a class="btn btn-ghost" href="/group_41/forms/submit.php?id=<?php echo (int) $form['id']; ?>">前往填寫</a>
+										<?php else : ?>
+											<span class="muted">尚未發布</span>
+										<?php endif; ?>
+									</div>
+								</article>
+							<?php endforeach; ?>
+						</div>
+					<?php endif; ?>
+				</div>
+			</section>
+		</main>
 
-<?php include_once $_SERVER['DOCUMENT_ROOT'] . '/group_41/includes/footer.php'; ?>
+		<footer class="footer container">社團表單系統</footer>
+		<script src="/group_41/js/app.js"></script>
+	</body>
+</html>
 
+<?php
+exit();

@@ -1,134 +1,266 @@
 <?php
-include_once $_SERVER['DOCUMENT_ROOT'] . '/group_41/includes/db.php';
-include_once $_SERVER['DOCUMENT_ROOT'] . '/group_41/includes/functions.php';
+session_start();
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header('Location: /group_41/index.php');
-    exit();
+require __DIR__ . '/../includes/db.php';
+
+$user_raw = isset($_SESSION['user']) ? $_SESSION['user'] : null;
+$user = !empty($user_raw) ? htmlspecialchars($user_raw) : null;
+$form_id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+$form = null;
+$questions = [];
+$options_map = [];
+$errors = [];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+	$form_id = isset($_POST['form_id']) ? (int) $_POST['form_id'] : 0;
 }
 
-// 驗證CSRF令牌
-if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
-    header('Location: /group_41/index.php');
-    exit();
+if ($form_id > 0) {
+	try {
+		$pdo = get_db();
+		$stmt = $pdo->prepare('SELECT f.*, u.username FROM forms f JOIN users u ON u.id = f.creator_id WHERE f.id = :id LIMIT 1');
+		$stmt->execute([':id' => $form_id]);
+		$form = $stmt->fetch();
+
+		if ($form) {
+			$q_stmt = $pdo->prepare('SELECT * FROM form_questions WHERE form_id = :id ORDER BY question_order ASC');
+			$q_stmt->execute([':id' => $form_id]);
+			$questions = $q_stmt->fetchAll();
+
+			if (!empty($questions)) {
+				$question_ids = array_column($questions, 'id');
+				$placeholders = implode(',', array_fill(0, count($question_ids), '?'));
+				$o_stmt = $pdo->prepare('SELECT * FROM question_options WHERE question_id IN (' . $placeholders . ') ORDER BY option_order ASC');
+				$o_stmt->execute($question_ids);
+				$options = $o_stmt->fetchAll();
+				foreach ($options as $opt) {
+					$options_map[$opt['question_id']][] = $opt;
+				}
+			}
+		}
+	} catch (Throwable $e) {
+		$errors[] = '表單資料載入失敗，請稍後再試。';
+	}
 }
 
-$form_id = $_POST['form_id'] ?? 0;
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $form && empty($errors)) {
+	if ($form['status'] !== 'published') {
+		$errors[] = '此表單尚未發布，無法填寫。';
+	} else {
+		$answers = (isset($_POST['answers']) && is_array($_POST['answers'])) ? $_POST['answers'] : [];
+		$valid_option_ids = [];
+		foreach ($options_map as $qid => $opts) {
+			$valid_option_ids[$qid] = array_column($opts, 'id');
+		}
 
-if (!$form_id) {
-    header('Location: /group_41/index.php');
-    exit();
-}
+		foreach ($questions as $q) {
+			$qid = $q['id'];
+			$required = (bool) $q['is_required'];
+			$type = $q['question_type'];
+			$value = isset($answers[$qid]) ? $answers[$qid] : null;
 
-try {
-    // 檢查表單是否存在
-    $sql = "SELECT * FROM forms WHERE id = ? AND status = 'published'";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([$form_id]);
-    $form = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if (!$form) {
-        header('Location: /group_41/index.php');
-        exit();
-    }
+			if (in_array($type, ['short_answer', 'long_answer'], true)) {
+				$text = is_string($value) ? trim($value) : '';
+				if ($required && $text === '') {
+					$errors[] = '題目「' . $q['question_text'] . '」為必填。';
+				}
+			} elseif ($type === 'multiple_choice') {
+				$option_id = (int) $value;
+				if ($required && $option_id === 0) {
+					$errors[] = '題目「' . $q['question_text'] . '」為必填。';
+				} elseif ($option_id !== 0 && (!isset($valid_option_ids[$qid]) || !in_array($option_id, $valid_option_ids[$qid], true))) {
+					$errors[] = '題目「' . $q['question_text'] . '」的選項無效。';
+				}
+			} elseif ($type === 'multi_choice') {
+				$option_ids = is_array($value) ? $value : [];
+				$option_ids = array_map('intval', $option_ids);
+				if ($required && empty($option_ids)) {
+					$errors[] = '題目「' . $q['question_text'] . '」為必填。';
+				} else {
+					foreach ($option_ids as $oid) {
+						if (!isset($valid_option_ids[$qid]) || !in_array($oid, $valid_option_ids[$qid], true)) {
+							$errors[] = '題目「' . $q['question_text'] . '」的選項無效。';
+							break;
+						}
+					}
+				}
+			}
+		}
+	}
 
-    // 伺服器端再次檢查私人表單權限
-    if ($form['form_type'] === 'club_only') {
-        if (!is_logged_in()) {
-            throw new Exception('此私人表單需要登入後填寫');
-        }
-        $user = get_current_user_info();
-        if (!$user || ($user['role'] !== 'admin' && $user['club_category'] !== $form['target_club_category'])) {
-            throw new Exception('你不在此表單允許的社團內');
-        }
-    }
-    
-    // 開始事務
-    $pdo->beginTransaction();
-    
-    // 建立填寫記錄
-    $user_id = is_logged_in() ? $_SESSION['user_id'] : null;
-    $ip_address = get_user_ip();
-    
-    $sql = "INSERT INTO form_submissions (form_id, user_id, ip_address) VALUES (?, ?, ?)";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([$form_id, $user_id, $ip_address]);
-    $submission_id = $pdo->lastInsertId();
-    
-    // 處理答案
-    $sql = "SELECT * FROM form_questions WHERE form_id = ?";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([$form_id]);
-    $questions = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    foreach ($questions as $question) {
-        $answer_key = 'answer_' . $question['id'];
-        $answer_value = $_POST[$answer_key] ?? '';
-        $is_multi_choice = ($question['question_type'] === 'multi_choice');
-        $selected_options = $is_multi_choice ? ($answer_value ?? []) : [];
+	if (empty($errors)) {
+		try {
+			$pdo = get_db();
+			$pdo->beginTransaction();
+			$user_id = null;
+			if ($user_raw) {
+				$u = $pdo->prepare('SELECT id FROM users WHERE username = :u LIMIT 1');
+				$u->execute([':u' => $user_raw]);
+				$urow = $u->fetch();
+				$user_id = $urow ? (int) $urow['id'] : null;
+			}
+			$s = $pdo->prepare('INSERT INTO form_submissions (form_id, user_id, ip_address) VALUES (:f, :u, :ip)');
+			$s->execute([
+				':f' => $form_id,
+				':u' => $user_id,
+				':ip' => isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : null
+			]);
+			$submission_id = (int) $pdo->lastInsertId();
 
-        if ($is_multi_choice && !is_array($selected_options)) {
-            $selected_options = [];
-        }
-        
-        // 驗證必填項
-        if ($question['is_required']) {
-            if ($is_multi_choice && count($selected_options) === 0) {
-                throw new Exception('必填項目不能為空');
-            }
-            if (!$is_multi_choice && empty($answer_value)) {
-                throw new Exception('必填項目不能為空');
-            }
-        }
+			$a = $pdo->prepare('INSERT INTO answers (submission_id, question_id, answer_text, option_id) VALUES (:s, :q, :t, :o)');
+			foreach ($questions as $q) {
+				$qid = $q['id'];
+				$type = $q['question_type'];
+				$value = isset($answers[$qid]) ? $answers[$qid] : null;
 
-        if ($question['question_type'] === 'short_answer' || $question['question_type'] === 'long_answer') {
-            $answer_text = trim((string)$answer_value);
-            if ($answer_text === '') {
-                continue;
-            }
+				if (in_array($type, ['short_answer', 'long_answer'], true)) {
+					$text = is_string($value) ? trim($value) : '';
+					if ($text !== '') {
+						$a->execute([
+							':s' => $submission_id,
+							':q' => $qid,
+							':t' => $text,
+							':o' => null
+						]);
+					}
+				} elseif ($type === 'multiple_choice') {
+					$option_id = (int) $value;
+					if ($option_id) {
+						$a->execute([
+							':s' => $submission_id,
+							':q' => $qid,
+							':t' => null,
+							':o' => $option_id
+						]);
+					}
+				} elseif ($type === 'multi_choice') {
+					$option_ids = is_array($value) ? $value : [];
+					$option_ids = array_map('intval', $option_ids);
+					foreach ($option_ids as $oid) {
+						if ($oid) {
+							$a->execute([
+								':s' => $submission_id,
+								':q' => $qid,
+								':t' => null,
+								':o' => $oid
+							]);
+						}
+					}
+				}
+			}
 
-            $sql = "INSERT INTO answers (submission_id, question_id, answer_text) 
-                    VALUES (?, ?, ?)";
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute([$submission_id, $question['id'], $answer_text]);
-        } elseif ($question['question_type'] === 'multiple_choice') {
-            if (empty($answer_value)) {
-                continue;
-            }
-
-            $sql = "INSERT INTO answers (submission_id, question_id, option_id) 
-                    VALUES (?, ?, ?)";
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute([$submission_id, $question['id'], (int)$answer_value]);
-        } elseif ($question['question_type'] === 'multi_choice') {
-            foreach ($selected_options as $opt_id) {
-                $opt_id = (int)$opt_id;
-                if ($opt_id <= 0) {
-                    continue;
-                }
-
-                $sql = "INSERT INTO answers (submission_id, question_id, option_id) 
-                        VALUES (?, ?, ?)";
-                $stmt = $pdo->prepare($sql);
-                $stmt->execute([$submission_id, $question['id'], $opt_id]);
-            }
-        } else {
-            throw new Exception('包含不支援的題目類型');
-        }
-    }
-    
-    $pdo->commit();
-    
-    // 重定向到成功頁面
-    header('Location: /group_41/forms/success.php?form_id=' . $form_id);
-    exit();
-    
-} catch (Exception $e) {
-    if ($pdo->inTransaction()) {
-        $pdo->rollBack();
-    }
-    header('Location: /group_41/forms/view.php?id=' . $form_id . '&error=' . urlencode($e->getMessage()));
-    exit();
+			$pdo->commit();
+			header('Location: /group_41/forms/success.php?id=' . $submission_id);
+			exit();
+		} catch (Throwable $e) {
+			if (!empty($pdo) && $pdo->inTransaction()) {
+				$pdo->rollBack();
+			}
+			$errors[] = '送出失敗，請稍後再試。';
+		}
+	}
 }
 ?>
+<!doctype html>
+<html lang="zh-Hant">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>填寫表單 | 社團表單系統</title>
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700&display=swap"
+			rel="stylesheet"
+		/>
+		<link rel="stylesheet" href="/group_41/css/app.css" />
+	</head>
+	<body>
+		<header class="topbar">
+			<div class="container nav">
+				<a href="/group_41/index.php" class="brand">Club Form Studio</a>
+				<nav class="menu">
+					<a class="link-btn" href="/group_41/forms/list.php">表單列表</a>
+					<a class="link-btn" href="/group_41/forms/create.php">新增表單</a>
+					<?php if ($user) : ?>
+						<a class="btn btn-primary" href="/group_41/logout.php">登出</a>
+					<?php else : ?>
+						<a class="link-btn" href="/group_41/login.php">登入</a>
+						<a class="btn btn-primary" href="/group_41/register.php">註冊</a>
+					<?php endif; ?>
+				</nav>
+			</div>
+		</header>
 
+		<main class="section">
+			<div class="container">
+				<h1>填寫表單</h1>
+				<?php if (!empty($errors)) : ?>
+					<div class="error">
+						<ul>
+							<?php foreach ($errors as $e) : ?>
+								<li><?php echo htmlspecialchars($e); ?></li>
+							<?php endforeach; ?>
+						</ul>
+					</div>
+				<?php endif; ?>
+				<?php if (!$form) : ?>
+					<div class="panel" style="padding: 20px">
+						<p class="muted">找不到指定的表單。</p>
+						<a class="btn btn-ghost" href="/group_41/forms/list.php">返回列表</a>
+					</div>
+				<?php else : ?>
+					<div class="panel" style="padding: 20px">
+						<h2><?php echo htmlspecialchars($form['title']); ?></h2>
+						<p class="muted"><?php echo htmlspecialchars($form['description'] ?: '尚未提供表單說明。'); ?></p>
+						<?php if ($form['status'] !== 'published') : ?>
+							<p class="muted">此表單尚未發布，暫時無法填寫。</p>
+						<?php else : ?>
+							<form method="post" action="/group_41/forms/submit.php">
+								<input type="hidden" name="form_id" value="<?php echo $form_id; ?>" />
+								<?php foreach ($questions as $q) : ?>
+									<div class="field" style="margin-top: 16px">
+										<label>
+											<?php echo htmlspecialchars($q['question_text']); ?>
+											<?php if ($q['is_required']) : ?>
+												<span class="muted">(必填)</span>
+											<?php endif; ?>
+										</label>
+										<?php if (in_array($q['question_type'], ['short_answer', 'long_answer'], true)) : ?>
+											<?php if ($q['question_type'] === 'short_answer') : ?>
+												<input name="answers[<?php echo $q['id']; ?>]" />
+											<?php else : ?>
+												<textarea name="answers[<?php echo $q['id']; ?>]" rows="3"></textarea>
+											<?php endif; ?>
+										<?php elseif ($q['question_type'] === 'multiple_choice') : ?>
+											<?php foreach ($options_map[$q['id']] ?? [] as $opt) : ?>
+												<label style="display: block; margin-top: 6px">
+													<input type="radio" name="answers[<?php echo $q['id']; ?>]" value="<?php echo $opt['id']; ?>" />
+													<?php echo htmlspecialchars($opt['option_text']); ?>
+												</label>
+											<?php endforeach; ?>
+										<?php elseif ($q['question_type'] === 'multi_choice') : ?>
+											<?php foreach ($options_map[$q['id']] ?? [] as $opt) : ?>
+												<label style="display: block; margin-top: 6px">
+													<input type="checkbox" name="answers[<?php echo $q['id']; ?>][]" value="<?php echo $opt['id']; ?>" />
+													<?php echo htmlspecialchars($opt['option_text']); ?>
+												</label>
+											<?php endforeach; ?>
+										<?php endif; ?>
+									</div>
+								<?php endforeach; ?>
+								<button class="btn btn-primary" type="submit" style="margin-top: 16px">送出</button>
+							</form>
+						<?php endif; ?>
+					</div>
+				<?php endif; ?>
+			</div>
+		</main>
+
+		<footer class="footer container">社團表單系統</footer>
+		<script src="/group_41/js/app.js"></script>
+	</body>
+</html>
+
+<?php
+exit();

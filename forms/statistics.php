@@ -1,323 +1,351 @@
 <?php
-include_once $_SERVER['DOCUMENT_ROOT'] . '/group_41/includes/header.php';
+session_start();
+require __DIR__ . '/../includes/db.php';
 
-if (!is_logged_in() || !in_array($current_user['role'], ['admin', 'club_officer'])) {
-    header('Location: /group_41/index.php');
-    exit();
+$current_user_raw = isset($_SESSION['user']) ? $_SESSION['user'] : null;
+$current_user = null;
+$errors = [];
+$form_id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+$form = null;
+$questions = [];
+$options_map = [];
+$submissions = [];
+$answers_map = [];
+$summary = [];
+$chart_data = [];
+$view = isset($_GET['view']) ? $_GET['view'] : 'detail';
+if (!in_array($view, ['detail', 'summary'], true)) {
+	$view = 'detail';
 }
 
-$form_id = $_GET['id'] ?? 0;
+$type_labels = [
+	'public' => '公開表單',
+	'club_only' => '限定社團'
+];
+$status_labels = [
+	'draft' => '草稿',
+	'published' => '已發布',
+	'closed' => '已關閉'
+];
 
-if (!$form_id) {
-    header('Location: /group_41/index.php');
-    exit();
+if (!$current_user_raw) {
+	$errors[] = '請先登入才能查看填寫紀錄。';
+}
+
+if ($form_id <= 0) {
+	$errors[] = '找不到指定的表單。';
 }
 
 try {
-    $sql = "SELECT f.*, u.username FROM forms f 
-            LEFT JOIN users u ON f.creator_id = u.id
-            WHERE f.id = ?";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([$form_id]);
-    $form = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if (!$form) {
-        header('Location: /group_41/index.php');
-        exit();
-    }
-    
-    // 獲取所有題目
-    $sql = "SELECT * FROM form_questions WHERE form_id = ? ORDER BY question_order";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([$form_id]);
-    $questions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+	$pdo = get_db();
+	if ($current_user_raw) {
+		$u = $pdo->prepare('SELECT id, username, role, club_category FROM users WHERE username = :u LIMIT 1');
+		$u->execute([':u' => $current_user_raw]);
+		$current_user = $u->fetch();
+	}
+} catch (Throwable $e) {
+	$errors[] = '資料庫連線失敗，請稍後再試。';
+}
 
-    // 獲取填寫者清單（同帳號或同訪客IP會合併）
-    $sql = "SELECT
-                fs.user_id,
-                fs.ip_address,
-                u.username,
-                u.email,
-                u.club_category,
-                COUNT(*) AS submit_count,
-                MAX(fs.submitted_at) AS last_submitted_at
-            FROM form_submissions fs
-            LEFT JOIN users u ON fs.user_id = u.id
-            WHERE fs.form_id = ?
-            GROUP BY fs.user_id, fs.ip_address, u.username, u.email, u.club_category
-            ORDER BY last_submitted_at DESC";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([$form_id]);
-    $respondents = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-} catch (Exception $e) {
-    echo '錯誤：' . $e->getMessage();
-    exit();
+if (empty($errors)) {
+	$stmt = $pdo->prepare('SELECT f.*, u.username, u.club_category AS creator_club FROM forms f JOIN users u ON u.id = f.creator_id WHERE f.id = :id LIMIT 1');
+	$stmt->execute([':id' => $form_id]);
+	$form = $stmt->fetch();
+	if (!$form) {
+		$errors[] = '找不到指定的表單。';
+	}
+}
+
+$can_view = false;
+if ($current_user && $form) {
+	if ($current_user['role'] === 'admin') {
+		$can_view = true;
+	} elseif ($current_user['role'] === 'club_officer' && $form['creator_club'] === $current_user['club_category']) {
+		$can_view = true;
+	}
+}
+
+if ($form && !$can_view) {
+	$errors[] = '你沒有權限查看此表單的填寫紀錄。';
+}
+
+if (empty($errors)) {
+	$q_stmt = $pdo->prepare('SELECT * FROM form_questions WHERE form_id = :id ORDER BY question_order ASC');
+	$q_stmt->execute([':id' => $form_id]);
+	$questions = $q_stmt->fetchAll();
+
+	if (!empty($questions)) {
+		$question_ids = array_column($questions, 'id');
+		$placeholders = implode(',', array_fill(0, count($question_ids), '?'));
+		$o_stmt = $pdo->prepare('SELECT * FROM question_options WHERE question_id IN (' . $placeholders . ') ORDER BY option_order ASC');
+		$o_stmt->execute($question_ids);
+		$options = $o_stmt->fetchAll();
+		foreach ($options as $opt) {
+			$options_map[$opt['question_id']][] = $opt;
+		}
+	}
+
+	$s_stmt = $pdo->prepare('SELECT s.id, s.submitted_at, s.user_id, s.ip_address, u.username AS submitter FROM form_submissions s LEFT JOIN users u ON u.id = s.user_id WHERE s.form_id = :id ORDER BY s.submitted_at DESC');
+	$s_stmt->execute([':id' => $form_id]);
+	$submissions = $s_stmt->fetchAll();
+
+	if (!empty($submissions)) {
+		$submission_ids = array_column($submissions, 'id');
+		$placeholders = implode(',', array_fill(0, count($submission_ids), '?'));
+		$a_stmt = $pdo->prepare('SELECT a.submission_id, a.question_id, a.answer_text, a.option_id, o.option_text FROM answers a LEFT JOIN question_options o ON o.id = a.option_id WHERE a.submission_id IN (' . $placeholders . ') ORDER BY a.submission_id ASC, a.question_id ASC, o.option_order ASC');
+		$a_stmt->execute($submission_ids);
+		$answers = $a_stmt->fetchAll();
+		foreach ($answers as $row) {
+			$value = '';
+			if (!empty($row['option_id'])) {
+				$value = $row['option_text'];
+			} else {
+				$value = $row['answer_text'];
+			}
+			if ($value === null || $value === '') {
+				continue;
+			}
+			$answers_map[$row['submission_id']][$row['question_id']][] = $value;
+		}
+	}
+
+	if (!empty($questions)) {
+		$question_ids = array_column($questions, 'id');
+		$placeholders = implode(',', array_fill(0, count($question_ids), '?'));
+		$choice_counts = [];
+		$text_counts = [];
+
+		$choice_stmt = $pdo->prepare('SELECT question_id, option_id, COUNT(*) AS cnt FROM answers WHERE question_id IN (' . $placeholders . ') AND option_id IS NOT NULL GROUP BY question_id, option_id');
+		$choice_stmt->execute($question_ids);
+		foreach ($choice_stmt->fetchAll() as $row) {
+			$choice_counts[$row['question_id']][$row['option_id']] = (int) $row['cnt'];
+		}
+
+		$text_stmt = $pdo->prepare('SELECT question_id, COUNT(*) AS cnt FROM answers WHERE question_id IN (' . $placeholders . ') AND answer_text IS NOT NULL AND answer_text <> "" GROUP BY question_id');
+		$text_stmt->execute($question_ids);
+		foreach ($text_stmt->fetchAll() as $row) {
+			$text_counts[$row['question_id']] = (int) $row['cnt'];
+		}
+
+		foreach ($questions as $q) {
+			$entry = [
+				'id' => $q['id'],
+				'text' => $q['question_text'],
+				'type' => $q['question_type'],
+				'required' => (bool) $q['is_required'],
+				'answers' => []
+			];
+			if (in_array($q['question_type'], ['multiple_choice', 'multi_choice'], true)) {
+				foreach ($options_map[$q['id']] ?? [] as $opt) {
+					$entry['answers'][] = [
+						'label' => $opt['option_text'],
+						'count' => isset($choice_counts[$q['id']][$opt['id']]) ? $choice_counts[$q['id']][$opt['id']] : 0
+					];
+				}
+				$chart_data[] = [
+					'id' => $q['id'],
+					'label' => $q['question_text'],
+					'labels' => array_map(function ($row) { return $row['label']; }, $entry['answers']),
+					'counts' => array_map(function ($row) { return $row['count']; }, $entry['answers'])
+				];
+			} else {
+				$entry['answer_count'] = isset($text_counts[$q['id']]) ? $text_counts[$q['id']] : 0;
+			}
+			$summary[$q['id']] = $entry;
+		}
+	}
 }
 ?>
+<!doctype html>
+<html lang="zh-Hant">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>填寫紀錄 | 社團表單系統</title>
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700&display=swap"
+			rel="stylesheet"
+		/>
+		<link rel="stylesheet" href="/group_41/css/app.css" />
+	</head>
+	<body>
+		<header class="topbar">
+			<div class="container nav">
+				<a href="/group_41/index.php" class="brand">Club Form Studio</a>
+				<nav class="menu">
+					<a class="link-btn" href="/group_41/forms/list.php">表單列表</a>
+					<a class="link-btn" href="/group_41/forms/create.php">新增表單</a>
+					<?php if ($current_user) : ?>
+						<a class="btn btn-primary" href="/group_41/logout.php">登出</a>
+					<?php else : ?>
+						<a class="link-btn" href="/group_41/login.php">登入</a>
+						<a class="btn btn-primary" href="/group_41/register.php">註冊</a>
+					<?php endif; ?>
+				</nav>
+			</div>
+		</header>
 
-<h2 class="mb-4">📊 表單統計：<?php echo escape($form['title']); ?></h2>
+		<main class="section">
+			<div class="container">
+				<h1>填寫紀錄</h1>
+				<?php if (!empty($errors)) : ?>
+					<div class="error">
+						<ul>
+							<?php foreach ($errors as $e) : ?>
+								<li><?php echo htmlspecialchars($e); ?></li>
+							<?php endforeach; ?>
+						</ul>
+					</div>
+					<a class="btn btn-ghost" href="/group_41/forms/list.php">返回列表</a>
+				<?php else : ?>
+					<?php
+						$type_label = isset($type_labels[$form['form_type']]) ? $type_labels[$form['form_type']] : $form['form_type'];
+						$status_label = isset($status_labels[$form['status']]) ? $status_labels[$form['status']] : $form['status'];
+						$created_at = !empty($form['created_at']) ? date('Y-m-d', strtotime($form['created_at'])) : '';
+					?>
+					<div class="panel" style="padding: 20px">
+						<span class="pill"><?php echo htmlspecialchars($type_label); ?></span>
+						<h2><?php echo htmlspecialchars($form['title']); ?></h2>
+						<p class="muted"><?php echo htmlspecialchars($form['description'] ?: '尚未提供表單說明。'); ?></p>
+						<p class="meta">
+							出題者：<?php echo htmlspecialchars($form['username']); ?> ・ 狀態：<?php echo htmlspecialchars($status_label); ?> ・ 建立日：<?php echo htmlspecialchars($created_at); ?> ・ 總填寫數：<?php echo number_format(count($submissions)); ?>
+						</p>
+						<div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap">
+							<?php if ($view === 'detail') : ?>
+								<a class="btn btn-primary" href="/group_41/forms/statistics.php?id=<?php echo $form_id; ?>&view=detail">詳細紀錄</a>
+								<a class="btn btn-ghost" href="/group_41/forms/statistics.php?id=<?php echo $form_id; ?>&view=summary">統整圖表</a>
+							<?php else : ?>
+								<a class="btn btn-ghost" href="/group_41/forms/statistics.php?id=<?php echo $form_id; ?>&view=detail">詳細紀錄</a>
+								<a class="btn btn-primary" href="/group_41/forms/statistics.php?id=<?php echo $form_id; ?>&view=summary">統整圖表</a>
+							<?php endif; ?>
+							<a class="btn btn-ghost" href="/group_41/forms/view.php?id=<?php echo $form_id; ?>">返回表單</a>
+							<a class="btn btn-ghost" href="/group_41/forms/edit.php?id=<?php echo $form_id; ?>">修改表單</a>
+						</div>
+					</div>
 
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card bg-primary text-white">
-            <div class="card-body">
-                <h5 class="card-title">總填寫人數</h5>
-                <h3>
-                    <?php
-                    $sql = "SELECT COUNT(DISTINCT user_id, ip_address) as count FROM form_submissions WHERE form_id = ?";
-                    $stmt = $pdo->prepare($sql);
-                    $stmt->execute([$form_id]);
-                    $result = $stmt->fetch();
-                    echo $result ? $result['count'] : 0;
-                    ?>
-                </h3>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card bg-success text-white">
-            <div class="card-body">
-                <h5 class="card-title">總填寫次數</h5>
-                <h3>
-                    <?php
-                    $sql = "SELECT COUNT(*) as count FROM form_submissions WHERE form_id = ?";
-                    $stmt = $pdo->prepare($sql);
-                    $stmt->execute([$form_id]);
-                    echo $stmt->fetch()['count'];
-                    ?>
-                </h3>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card bg-info text-white">
-            <div class="card-body">
-                <h5 class="card-title">總題數</h5>
-                <h3><?php echo count($questions); ?></h3>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card bg-warning text-dark">
-            <div class="card-body">
-                <h5 class="card-title">回覆率</h5>
-                <h3>
-                    <?php
-                    $sql = "SELECT COUNT(*) as count FROM form_submissions WHERE form_id = ?";
-                    $stmt = $pdo->prepare($sql);
-                    $stmt->execute([$form_id]);
-                    $total_submissions = $stmt->fetch()['count'];
-                    echo $total_submissions > 0 ? '100%' : '0%';
-                    ?>
-                </h3>
-            </div>
-        </div>
-    </div>
-</div>
+					<?php if ($view === 'summary') : ?>
+						<?php if (empty($summary)) : ?>
+							<div class="panel" style="padding: 20px; margin-top: 16px">
+								<p class="muted">尚無題目可供統計。</p>
+							</div>
+						<?php else : ?>
+							<?php foreach ($questions as $q) : ?>
+								<?php
+									$summary_item = $summary[$q['id']] ?? null;
+									if (!$summary_item) {
+										continue;
+									}
+								?>
+								<div class="panel" style="padding: 20px; margin-top: 16px">
+									<h3>Q<?php echo htmlspecialchars($q['question_order']); ?>. <?php echo htmlspecialchars($q['question_text']); ?></h3>
+									<p class="muted">題型：<?php echo htmlspecialchars($q['question_type']); ?> ・ <?php echo $q['is_required'] ? '必填' : '選填'; ?></p>
+									<?php if (in_array($q['question_type'], ['multiple_choice', 'multi_choice'], true)) : ?>
+										<canvas id="chart-q-<?php echo $q['id']; ?>" height="140"></canvas>
+										<div style="margin-top: 8px">
+											<?php foreach ($summary_item['answers'] as $row) : ?>
+												<div class="meta"><?php echo htmlspecialchars($row['label']); ?>：<?php echo number_format($row['count']); ?></div>
+											<?php endforeach; ?>
+										</div>
+									<?php else : ?>
+										<p class="muted">已填：<?php echo number_format($summary_item['answer_count']); ?> / <?php echo number_format(count($submissions)); ?></p>
+									<?php endif; ?>
+								</div>
+							<?php endforeach; ?>
+						<?php endif; ?>
+					<?php else : ?>
+						<?php if (empty($submissions)) : ?>
+							<div class="panel" style="padding: 20px; margin-top: 16px">
+								<p class="muted">尚無填寫紀錄。</p>
+							</div>
+						<?php else : ?>
+							<?php foreach ($submissions as $index => $submission) : ?>
+								<?php
+									$submitter = $submission['submitter'] ?: '訪客';
+									$submitted_at = !empty($submission['submitted_at']) ? date('Y-m-d H:i', strtotime($submission['submitted_at'])) : '';
+									$ip = $submission['ip_address'] ?: '-';
+								?>
+								<div class="panel" style="padding: 20px; margin-top: 16px">
+									<h3>填寫紀錄 #<?php echo htmlspecialchars($submission['id']); ?></h3>
+									<p class="meta">填寫者：<?php echo htmlspecialchars($submitter); ?> ・ IP：<?php echo htmlspecialchars($ip); ?> ・ 時間：<?php echo htmlspecialchars($submitted_at); ?></p>
+									<?php if (empty($questions)) : ?>
+										<p class="muted">此表單沒有題目。</p>
+									<?php else : ?>
+										<?php foreach ($questions as $q) : ?>
+											<?php
+												$answers = $answers_map[$submission['id']][$q['id']] ?? [];
+												$answer_text = '未填';
+												if (!empty($answers)) {
+													if (count($answers) === 1) {
+														$answer_text = nl2br(htmlspecialchars($answers[0]));
+													} else {
+														$clean_answers = array_map('htmlspecialchars', $answers);
+														$answer_text = implode('、', $clean_answers);
+													}
+												}
+											?>
+											<div style="padding: 12px 0; border-bottom: 1px solid #e4efe8">
+												<strong>Q<?php echo htmlspecialchars($q['question_order']); ?>. <?php echo htmlspecialchars($q['question_text']); ?></strong>
+												<p class="muted">題型：<?php echo htmlspecialchars($q['question_type']); ?> ・ <?php echo $q['is_required'] ? '必填' : '選填'; ?></p>
+												<p><?php echo $answer_text; ?></p>
+											</div>
+										<?php endforeach; ?>
+									<?php endif; ?>
+								</div>
+							<?php endforeach; ?>
+						<?php endif; ?>
+					<?php endif; ?>
+				<?php endif; ?>
+			</div>
+		</main>
 
-<hr class="my-4">
+		<footer class="footer container">社團表單系統</footer>
+		<script src="/group_41/js/app.js"></script>
+		<?php if ($view === 'summary' && !empty($chart_data)) : ?>
+			<script src="/group_41/js/chart.umd.js"></script>
+			<script>
+				(function(){
+					var charts = <?php echo json_encode($chart_data, JSON_UNESCAPED_UNICODE); ?>;
+					charts.forEach(function(item){
+						var canvas = document.getElementById('chart-q-' + item.id);
+						if (!canvas || !window.Chart) {
+							return;
+						}
+						var ctx = canvas.getContext('2d');
+						new Chart(ctx, {
+							type: 'bar',
+							data: {
+								labels: item.labels,
+								datasets: [{
+									label: '選擇數',
+									data: item.counts,
+									backgroundColor: 'rgba(11, 122, 90, 0.5)',
+									borderColor: 'rgba(11, 122, 90, 1)',
+									borderWidth: 1
+								}]
+							},
+							options: {
+								responsive: true,
+								plugins: {
+									legend: {
+										display: false
+									}
+								},
+								scales: {
+									y: {
+										beginAtZero: true,
+										precision: 0
+									}
+								}
+							}
+						});
+					});
+				})();
+			</script>
+		<?php endif; ?>
+	</body>
+</html>
 
-<h3 class="mb-3">填寫者清單</h3>
-
-<?php if (empty($respondents)): ?>
-    <div class="alert alert-info">目前尚無人填寫此表單</div>
-<?php else: ?>
-    <div class="table-responsive mb-4">
-        <table class="table table-sm table-hover">
-            <thead class="table-light">
-                <tr>
-                    <th>填寫者</th>
-                    <th>Email/IP</th>
-                    <th>社團</th>
-                    <th>填寫次數</th>
-                    <th>最後填寫時間</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($respondents as $row): ?>
-                    <?php
-                    $is_member = !empty($row['user_id']);
-                    $display_name = $is_member
-                        ? $row['username']
-                        : ('訪客' . (!empty($row['ip_address']) ? '（' . $row['ip_address'] . '）' : ''));
-                    $contact = $is_member
-                        ? ($row['email'] ?: '-')
-                        : ($row['ip_address'] ?: '-');
-                    $club = $is_member ? ($row['club_category'] ?: '-') : '-';
-                    ?>
-                    <tr>
-                        <td><?php echo escape($display_name); ?></td>
-                        <td><?php echo escape($contact); ?></td>
-                        <td><?php echo escape($club); ?></td>
-                        <td><?php echo (int)$row['submit_count']; ?></td>
-                        <td><?php echo date('Y-m-d H:i', strtotime($row['last_submitted_at'])); ?></td>
-                    </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-<?php endif; ?>
-
-<hr class="my-4">
-
-<h3>詳細統計</h3>
-
-<div class="accordion mb-4" id="statisticsAccordion">
-    <?php foreach ($questions as $q_index => $question): ?>
-        <div class="accordion-item">
-            <h2 class="accordion-header" id="heading<?php echo $question['id']; ?>">
-                <button class="accordion-button" type="button" data-bs-toggle="collapse" 
-                        data-bs-target="#collapse<?php echo $question['id']; ?>">
-                    Q<?php echo $q_index + 1; ?>: <?php echo escape($question['question_text']); ?>
-                </button>
-            </h2>
-            <div id="collapse<?php echo $question['id']; ?>" class="accordion-collapse collapse" 
-                 data-bs-parent="#statisticsAccordion">
-                <div class="accordion-body">
-                    <?php if (in_array($question['question_type'], ['short_answer', 'long_answer'])): ?>
-                        <!-- 文字題統計 -->
-                        <div class="table-responsive">
-                            <table class="table table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>編號</th>
-                                        <th>答案</th>
-                                        <th>填寫時間</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php
-                                    $sql = "SELECT a.answer_text, fs.submitted_at FROM answers a 
-                                            INNER JOIN form_submissions fs ON a.submission_id = fs.id
-                                            WHERE a.question_id = ? ORDER BY fs.submitted_at DESC";
-                                    $stmt = $pdo->prepare($sql);
-                                    $stmt->execute([$question['id']]);
-                                    $answers = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                                    
-                                    foreach ($answers as $a_index => $answer):
-                                    ?>
-                                        <tr>
-                                            <td><?php echo $a_index + 1; ?></td>
-                                            <td>
-                                                <small><?php echo escape(substr($answer['answer_text'], 0, 100)); ?>
-                                                    <?php if (strlen($answer['answer_text']) > 100): ?>...<?php endif; ?>
-                                                </small>
-                                            </td>
-                                            <td><small><?php echo date('Y-m-d H:i', strtotime($answer['submitted_at'])); ?></small></td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    
-                    <?php else: // multiple_choice or multi_choice ?>
-                        <!-- 選擇題統計圖表 -->
-                        <div class="row">
-                            <div class="col-md-6">
-                                <canvas id="chart_<?php echo $question['id']; ?>"></canvas>
-                            </div>
-                            <div class="col-md-6">
-                                <table class="table table-sm">
-                                    <thead>
-                                        <tr>
-                                            <th>選項</th>
-                                            <th>選擇數</th>
-                                            <th>百分比</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php
-                                        $sql = "SELECT qo.id, qo.option_text, COUNT(a.id) as count 
-                                                FROM question_options qo 
-                                                LEFT JOIN answers a ON qo.id = a.option_id AND a.question_id = ?
-                                                WHERE qo.question_id = ?
-                                                GROUP BY qo.id
-                                                ORDER BY qo.option_order";
-                                        $stmt = $pdo->prepare($sql);
-                                        $stmt->execute([$question['id'], $question['id']]);
-                                        $options = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                                        
-                                        $total_count = array_sum(array_column($options, 'count'));
-                                        
-                                        foreach ($options as $option):
-                                            $percentage = $total_count > 0 ? round(($option['count'] / $total_count) * 100, 1) : 0;
-                                        ?>
-                                            <tr>
-                                                <td><?php echo escape($option['option_text']); ?></td>
-                                                <td><?php echo $option['count']; ?></td>
-                                                <td>
-                                                    <strong><?php echo $percentage; ?>%</strong>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                        <tr class="table-info">
-                                            <td><strong>合計</strong></td>
-                                            <td><strong><?php echo $total_count; ?></strong></td>
-                                            <td><strong>100%</strong></td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                                <?php if ($question['question_type'] === 'multi_choice'): ?>
-                                    <small class="text-muted">多選題百分比以「總勾選次數」為基準計算。</small>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                        
-                        <script>
-                        (function() {
-                            const ctx = document.getElementById('chart_<?php echo $question['id']; ?>').getContext('2d');
-                            
-                            const labels = [
-                                <?php foreach ($options as $option): ?>
-                                    '<?php echo addslashes(escape($option['option_text'])); ?>',
-                                <?php endforeach; ?>
-                            ];
-                            
-                            const data = [
-                                <?php foreach ($options as $option): ?>
-                                    <?php echo $option['count']; ?>,
-                                <?php endforeach; ?>
-                            ];
-                            
-                            const bgColors = [
-                                '#667eea', '#764ba2', '#f093fb', '#4facfe', 
-                                '#43e97b', '#fa709a', '#fee140', '#30cfd0',
-                                '#a8edea', '#fed6e3', '#74b9ff', '#a29bfe'
-                            ];
-                            
-                            new Chart(ctx, {
-                                type: 'doughnut',
-                                data: {
-                                    labels: labels,
-                                    datasets: [{
-                                        data: data,
-                                        backgroundColor: bgColors.slice(0, labels.length),
-                                        borderColor: '#fff',
-                                        borderWidth: 2
-                                    }]
-                                },
-                                options: {
-                                    responsive: true,
-                                    plugins: {
-                                        legend: {
-                                            position: 'bottom'
-                                        }
-                                    }
-                                }
-                            });
-                        })();
-                        </script>
-                    <?php endif; ?>
-                </div>
-            </div>
-        </div>
-    <?php endforeach; ?>
-</div>
-
-<div class="text-end mb-3">
-    <a href="/group_41/forms/list.php" class="btn btn-outline-secondary">返回表單列表</a>
-</div>
-
-<?php include_once $_SERVER['DOCUMENT_ROOT'] . '/group_41/includes/footer.php'; ?>
-
+<?php
+exit();

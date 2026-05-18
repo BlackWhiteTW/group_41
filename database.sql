@@ -97,13 +97,11 @@ CREATE TABLE answers (
 -- 插入測試數據
 -- 注意：此處使用 SHA2 供資料庫初始匯入，登入後系統會自動升級為 password_hash(BCRYPT)
 INSERT INTO users (username, password, email, club_category, role) VALUES
-('admin', SHA2('admin123', 256), 'admin@school.edu', '管理員', 'admin'),
-('officer1', SHA2('officer123', 256), 'officer1@school.edu', '學生會', 'club_officer'),
-('member1', SHA2('member123', 256), 'member1@school.edu', '學生會', 'member'),
-('member2', SHA2('member456', 256), 'member2@school.edu', '資訊社', 'member');
+('admin', SHA2('admin123456', 256), 'admin@school.edu', '管理員', 'admin'),
+('officer', SHA2('officer123456', 256), 'officer1@school.edu', '學生會', 'club_officer'),
+('member', SHA2('member123456', 256), 'member1@school.edu', '學生會', 'member');
 
 -- 插入社團與擁有者
 INSERT INTO clubs (name, owner_user_id) VALUES
 ('學生會', 2),
-('資訊社', 2),
-('其他', 2);
+('資訊社', 2);
