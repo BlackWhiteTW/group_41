@@ -1,4 +1,5 @@
 <?php
+// API 端點：檢查使用者名稱是否可用（AJAX 用）
 header('Content-Type: application/json; charset=utf-8');
 require __DIR__ . '/../includes/db.php';
 

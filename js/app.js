@@ -5,8 +5,14 @@ document.addEventListener('DOMContentLoaded', function(){
   var existingWrap = document.getElementById('existingClubWrap');
   var newWrap = document.getElementById('newClubWrap');
   if (existingRadio && newRadio && existingWrap && newWrap) {
-    existingRadio.addEventListener('change', function(){ existingWrap.style.display = 'block'; newWrap.style.display = 'none'; });
-    newRadio.addEventListener('change', function(){ existingWrap.style.display = 'none'; newWrap.style.display = 'block'; });
+    var syncClubMode = function(){
+      var useExisting = existingRadio.checked;
+      existingWrap.style.display = useExisting ? 'block' : 'none';
+      newWrap.style.display = useExisting ? 'none' : 'block';
+    };
+    existingRadio.addEventListener('change', syncClubMode);
+    newRadio.addEventListener('change', syncClubMode);
+    syncClubMode();
   }
 
   var formType = document.getElementById('form_type');

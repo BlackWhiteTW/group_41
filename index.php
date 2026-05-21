@@ -1,4 +1,5 @@
 <?php
+// 社團系統首頁：展示公開表單、統計資訊和導航連結
 session_start();
 
 require __DIR__ . '/includes/db.php';
@@ -49,23 +50,8 @@ try {
 		<link rel="stylesheet" href="/group_41/css/app.css" />
 	</head>
 	<body>
-		<header class="topbar">
-			<div class="container nav">
-				<a href="/group_41/index.php" class="brand">Club Form Studio</a>
-				<nav class="menu">
-					<a class="link-btn" href="/group_41/forms/list.php">表單列表</a>
-					<a class="link-btn" href="/group_41/forms/create.php">新增表單</a>
-					<a class="link-btn" href="/group_41/clubs/manage.php">社團資訊</a>
-					<?php if ($user) : ?>
-						<a class="btn btn-primary" href="/group_41/logout.php">登出</a>
-					<?php else : ?>
-						<a class="link-btn" href="/group_41/login.php">登入</a>
-						<a class="btn btn-primary" href="/group_41/register.php">註冊</a>
-					<?php endif; ?>
-				</nav>
-				<span class="muted">登入狀態：<?php echo $user ? '已登入：' . $user : '未登入'; ?></span>
-			</div>
-		</header>
+		<?php $show_status = true; ?>
+		<?php require __DIR__ . '/includes/header.php'; ?>
 
 		<main>
 			<?php if ($flash_error) : ?>
@@ -78,13 +64,11 @@ try {
 			<section class="hero">
 				<div class="container hero-grid">
 					<article class="hero-card fade-up">
-						<span class="badge">PHP + HTML</span>
+						<span class="badge">歡迎使用</span>
 						<h1>
-							校園活動問卷平台<br />
-							整合前後端實作
+							校園活動問卷平台
 						</h1>
 						<p class="muted">
-							這一版整合 PHP 與資料庫，提供實際登入與表單管理流程。
 							<span>登入狀態：<?php echo $user ? '已登入：' . $user : '未登入'; ?></span>
 						</p>
 						<div

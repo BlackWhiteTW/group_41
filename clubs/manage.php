@@ -24,7 +24,7 @@ if (!$user_raw) {
 
 try {
 	$pdo = get_db();
-	$user_stmt = $pdo->prepare('SELECT id, username, role, club_category FROM users WHERE username = :u LIMIT 1');
+	$user_stmt = $pdo->prepare('SELECT id, username, role FROM users WHERE username = :u LIMIT 1');
 	$user_stmt->execute([':u' => $user_raw]);
 	$current_user = $user_stmt->fetch();
 	if (!$current_user) {
@@ -37,19 +37,14 @@ try {
 		if ($is_admin) {
 			$clubs = $pdo->query('SELECT c.id, c.name, u.username AS owner_name FROM clubs c JOIN users u ON u.id = c.owner_user_id ORDER BY c.name ASC')->fetchAll();
 		} else {
-			$allowed_clubs = [];
-			if (!empty($current_user['club_category'])) {
-				$allowed_clubs[] = $current_user['club_category'];
-			}
-			$owned_stmt = $pdo->prepare('SELECT name FROM clubs WHERE owner_user_id = :id');
-			$owned_stmt->execute([':id' => $current_user['id']]);
-			$owned_names = array_column($owned_stmt->fetchAll(), 'name');
-			$allowed_clubs = array_values(array_unique(array_merge($allowed_clubs, $owned_names)));
+			$mem_stmt = $pdo->prepare('SELECT club_id FROM club_memberships WHERE user_id = :id');
+			$mem_stmt->execute([':id' => $current_user['id']]);
+			$member_club_ids = array_map('intval', array_column($mem_stmt->fetchAll(), 'club_id'));
 
-			if (!empty($allowed_clubs)) {
-				$placeholders = implode(',', array_fill(0, count($allowed_clubs), '?'));
-				$club_stmt = $pdo->prepare("SELECT c.id, c.name, u.username AS owner_name FROM clubs c JOIN users u ON u.id = c.owner_user_id WHERE c.name IN ($placeholders) ORDER BY c.name ASC");
-				$club_stmt->execute($allowed_clubs);
+			if (!empty($member_club_ids)) {
+				$placeholders = implode(',', array_fill(0, count($member_club_ids), '?'));
+				$club_stmt = $pdo->prepare("SELECT c.id, c.name, u.username AS owner_name FROM clubs c JOIN users u ON u.id = c.owner_user_id WHERE c.id IN ($placeholders) ORDER BY c.name ASC");
+				$club_stmt->execute($member_club_ids);
 				$clubs = $club_stmt->fetchAll();
 			}
 		}
@@ -72,19 +67,19 @@ try {
 		if (!$club) {
 			$errors[] = '找不到指定的社團。';
 		} else {
-			$member_stmt = $pdo->prepare('SELECT username, email, role FROM users WHERE club_category = :club ORDER BY role DESC, username ASC');
-			$member_stmt->execute([':club' => $club['name']]);
+			$member_stmt = $pdo->prepare('SELECT u.username, u.email, m.role FROM club_memberships m JOIN users u ON u.id = m.user_id WHERE m.club_id = :club ORDER BY m.role DESC, u.username ASC');
+			$member_stmt->execute([':club' => $club['id']]);
 			$members_all = $member_stmt->fetchAll();
 			foreach ($members_all as $member) {
-				if ($member['role'] === 'club_officer') {
+				if (in_array($member['role'], ['owner', 'club_officer'], true)) {
 					$officers[] = $member;
 				} elseif ($member['role'] === 'member') {
 					$members[] = $member;
 				}
 			}
 
-			$form_stmt = $pdo->prepare('SELECT f.id, f.title, f.form_type, f.status, f.created_at, u.username FROM forms f JOIN users u ON u.id = f.creator_id WHERE u.club_category = :club ORDER BY f.created_at DESC');
-			$form_stmt->execute([':club' => $club['name']]);
+			$form_stmt = $pdo->prepare('SELECT f.id, f.title, f.form_type, f.status, f.created_at, u.username FROM forms f JOIN users u ON u.id = f.creator_id WHERE f.club_id = :club ORDER BY f.created_at DESC');
+			$form_stmt->execute([':club' => $club['id']]);
 			$forms = $form_stmt->fetchAll();
 			foreach ($forms as $form) {
 				if ($form['form_type'] === 'public') {
@@ -114,22 +109,7 @@ try {
 		<link rel="stylesheet" href="/group_41/css/app.css" />
 	</head>
 	<body>
-		<header class="topbar">
-			<div class="container nav">
-				<a href="/group_41/index.php" class="brand">Club Form Studio</a>
-				<nav class="menu">
-					<a class="link-btn" href="/group_41/index.php">首頁</a>
-					<a class="link-btn" href="/group_41/forms/list.php">表單列表</a>
-					<a class="link-btn" href="/group_41/forms/create.php">新增表單</a>
-					<?php if ($user) : ?>
-						<a class="btn btn-primary" href="/group_41/logout.php">登出</a>
-					<?php else : ?>
-						<a class="link-btn" href="/group_41/login.php">登入</a>
-						<a class="btn btn-primary" href="/group_41/register.php">註冊</a>
-					<?php endif; ?>
-				</nav>
-			</div>
-		</header>
+		<?php require __DIR__ . '/../includes/header.php'; ?>
 
 		<main class="section">
 			<div class="container">
@@ -143,6 +123,15 @@ try {
 							<?php endforeach; ?>
 						</ul>
 					</div>
+					<?php if (!$is_admin && in_array('你尚未加入任何社團。', $errors, true)) : ?>
+						<div class="panel" style="padding: 20px">
+							<p class="muted">你目前沒有綁定社團，可請管理員協助設定，或重新註冊並建立/加入社團。</p>
+							<div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap">
+								<a class="btn btn-primary" href="/group_41/register.php">建立/加入社團</a>
+								<a class="btn btn-ghost" href="/group_41/index.php">回首頁</a>
+							</div>
+						</div>
+					<?php endif; ?>
 				<?php else : ?>
 					<div style="display: grid; gap: 20px; grid-template-columns: minmax(220px, 1fr) minmax(0, 3fr)">
 						<div class="panel" style="padding: 16px">

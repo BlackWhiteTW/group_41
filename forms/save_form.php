@@ -1,3 +1,3 @@
 <?php
-header('Location: /group_41/frontend/form-create.html');
+header('Location: /group_41/forms/create.php');
 exit();

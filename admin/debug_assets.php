@@ -1,8 +1,26 @@
 <?php
-// 簡易診斷頁面：檢查重要資源是否存在並顯示路徑
+session_start();
+require __DIR__ . '/../includes/db.php';
+
+$user_raw = isset($_SESSION['user']) ? $_SESSION['user'] : null;
+if (empty($user_raw)) {
+    header('Location: /group_41/login.php');
+    exit();
+}
+
+$pdo = get_db();
+$u = $pdo->prepare('SELECT id, username, role FROM users WHERE username = :u LIMIT 1');
+$u->execute([':u' => $user_raw]);
+$current_user = $u->fetch();
+if (!$current_user || $current_user['role'] !== 'admin') {
+    $_SESSION['flash_error'] = '需要管理員權限才能使用除錯工具。';
+    header('Location: /group_41/index.php');
+    exit();
+}
+
 header('Content-Type: text/plain; charset=utf-8');
 
-$base = __DIR__ . '/';
+$base = __DIR__ . '/../';
 $checks = [
     'index' => $base . 'index.php',
     'login' => $base . 'login.php',
@@ -27,3 +45,10 @@ if ($index !== false) {
         echo "index.php: 未找到 CSS 連結字串\n";
     }
 }
+
+// 顯示其他實用資訊
+echo "\n環境資訊\n";
+echo "PHP version: " . phpversion() . "\n";
+echo "Server OS: " . PHP_OS . "\n";
+
+exit();

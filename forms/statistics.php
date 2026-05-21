@@ -4,6 +4,8 @@ require __DIR__ . '/../includes/db.php';
 
 $current_user_raw = isset($_SESSION['user']) ? $_SESSION['user'] : null;
 $current_user = null;
+$is_admin = false;
+$managed_clubs = [];
 $errors = [];
 $form_id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 $form = null;
@@ -39,16 +41,28 @@ if ($form_id <= 0) {
 try {
 	$pdo = get_db();
 	if ($current_user_raw) {
-		$u = $pdo->prepare('SELECT id, username, role, club_category FROM users WHERE username = :u LIMIT 1');
+		$u = $pdo->prepare('SELECT id, username, role FROM users WHERE username = :u LIMIT 1');
 		$u->execute([':u' => $current_user_raw]);
 		$current_user = $u->fetch();
+		if ($current_user && $current_user['role'] === 'admin') {
+			$is_admin = true;
+		} elseif ($current_user) {
+			$mem_stmt = $pdo->prepare('SELECT club_id, role FROM club_memberships WHERE user_id = :id');
+			$mem_stmt->execute([':id' => $current_user['id']]);
+			foreach ($mem_stmt->fetchAll() as $row) {
+				if (in_array($row['role'], ['owner', 'club_officer'], true)) {
+					$managed_clubs[] = (int) $row['club_id'];
+				}
+			}
+			$managed_clubs = array_values(array_unique($managed_clubs));
+		}
 	}
 } catch (Throwable $e) {
 	$errors[] = '資料庫連線失敗，請稍後再試。';
 }
 
 if (empty($errors)) {
-	$stmt = $pdo->prepare('SELECT f.*, u.username, u.club_category AS creator_club FROM forms f JOIN users u ON u.id = f.creator_id WHERE f.id = :id LIMIT 1');
+	$stmt = $pdo->prepare('SELECT f.*, u.username, c.name AS club_name FROM forms f JOIN users u ON u.id = f.creator_id JOIN clubs c ON c.id = f.club_id WHERE f.id = :id LIMIT 1');
 	$stmt->execute([':id' => $form_id]);
 	$form = $stmt->fetch();
 	if (!$form) {
@@ -58,9 +72,9 @@ if (empty($errors)) {
 
 $can_view = false;
 if ($current_user && $form) {
-	if ($current_user['role'] === 'admin') {
+	if ($is_admin) {
 		$can_view = true;
-	} elseif ($current_user['role'] === 'club_officer' && $form['creator_club'] === $current_user['club_category']) {
+	} elseif (in_array((int) $form['club_id'], $managed_clubs, true)) {
 		$can_view = true;
 	}
 }
@@ -171,21 +185,7 @@ if (empty($errors)) {
 		<link rel="stylesheet" href="/group_41/css/app.css" />
 	</head>
 	<body>
-		<header class="topbar">
-			<div class="container nav">
-				<a href="/group_41/index.php" class="brand">Club Form Studio</a>
-				<nav class="menu">
-					<a class="link-btn" href="/group_41/forms/list.php">表單列表</a>
-					<a class="link-btn" href="/group_41/forms/create.php">新增表單</a>
-					<?php if ($current_user) : ?>
-						<a class="btn btn-primary" href="/group_41/logout.php">登出</a>
-					<?php else : ?>
-						<a class="link-btn" href="/group_41/login.php">登入</a>
-						<a class="btn btn-primary" href="/group_41/register.php">註冊</a>
-					<?php endif; ?>
-				</nav>
-			</div>
-		</header>
+		<?php require __DIR__ . '/../includes/header.php'; ?>
 
 		<main class="section">
 			<div class="container">

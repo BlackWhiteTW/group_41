@@ -1,6 +1,7 @@
 <?php
+// SQL 資料檢視頁面（管理區）：提供管理員查看資料庫內各資料表內容的介面
 session_start();
-require __DIR__ . '/includes/db.php';
+require __DIR__ . '/../includes/db.php';
 
 $user_raw = isset($_SESSION['user']) ? $_SESSION['user'] : null;
 $user = !empty($user_raw) ? htmlspecialchars($user_raw) : null;
@@ -15,6 +16,7 @@ if (empty($user_raw)) {
 $allowed_tables = [
   'users',
   'clubs',
+  'club_memberships',
   'forms',
   'form_questions',
   'question_options',
@@ -68,7 +70,7 @@ try {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>SQL 資料檢視 | 社團表單系統</title>
+    <title>SQL 資料檢視 | 管理</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -78,26 +80,11 @@ try {
     <link rel="stylesheet" href="/group_41/css/app.css" />
   </head>
   <body>
-    <header class="topbar">
-      <div class="container nav">
-        <a href="/group_41/index.php" class="brand">Club Form Studio</a>
-        <nav class="menu">
-          <a class="link-btn" href="/group_41/index.php">首頁</a>
-          <a class="link-btn" href="/group_41/forms/list.php">表單列表</a>
-          <a class="link-btn" href="/group_41/forms/create.php">新增表單</a>
-          <?php if ($user) : ?>
-            <a class="btn btn-primary" href="/group_41/logout.php">登出</a>
-          <?php else : ?>
-            <a class="link-btn" href="/group_41/login.php">登入</a>
-            <a class="btn btn-primary" href="/group_41/register.php">註冊</a>
-          <?php endif; ?>
-        </nav>
-      </div>
-    </header>
+    <?php require __DIR__ . '/../includes/header.php'; ?>
 
     <main class="section">
       <div class="container">
-        <h1>SQL 資料檢視</h1>
+        <h1>SQL 資料檢視 (管理區)</h1>
         <p class="muted">顯示資料庫內的各資料表內容（最多 200 筆）。</p>
 
         <?php if (!empty($errors)) : ?>
@@ -110,7 +97,7 @@ try {
           </div>
         <?php else : ?>
           <div class="panel" style="padding: 20px; margin-bottom: 16px">
-            <form method="get" action="/group_41/sql_view.php" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center">
+            <form method="get" action="/group_41/admin/sql_view.php" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center">
               <label for="table">選擇資料表</label>
               <select id="table" name="table">
                 <?php foreach ($allowed_tables as $table) : ?>
@@ -124,7 +111,7 @@ try {
             </form>
             <div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap">
               <?php foreach ($allowed_tables as $table) : ?>
-                <a class="btn btn-ghost btn-small" href="/group_41/sql_view.php?table=<?php echo urlencode($table); ?>">
+                <a class="btn btn-ghost btn-small" href="/group_41/admin/sql_view.php?table=<?php echo urlencode($table); ?>">
                   <?php echo htmlspecialchars($table); ?>
                 </a>
               <?php endforeach; ?>

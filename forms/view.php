@@ -6,21 +6,54 @@ require __DIR__ . '/../includes/db.php';
 $user = !empty($_SESSION['user']) ? htmlspecialchars($_SESSION['user']) : null;
 $current_user_raw = isset($_SESSION['user']) ? $_SESSION['user'] : null;
 $current_user = null;
+$is_admin = false;
+$member_clubs = [];
+$managed_clubs = [];
+$club_map = [];
 $form_id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 $form = null;
 $questions = [];
 $options_map = [];
 $load_error = null;
 
+function parse_target_clubs($value)
+{
+	if (!is_string($value) || trim($value) === '') {
+		return [];
+	}
+	$items = array_map('trim', explode(',', $value));
+	$items = array_values(array_filter($items, 'strlen'));
+	return array_values(array_unique(array_map('intval', $items)));
+}
+
 if ($form_id > 0) {
 	try {
 		$pdo = get_db();
+		$clubs = $pdo->query('SELECT id, name FROM clubs')->fetchAll();
+		foreach ($clubs as $club_row) {
+			$club_map[(int) $club_row['id']] = $club_row['name'];
+		}
 		if ($current_user_raw) {
-			$u = $pdo->prepare('SELECT id, username, role, club_category FROM users WHERE username = :u LIMIT 1');
+			$u = $pdo->prepare('SELECT id, username, role FROM users WHERE username = :u LIMIT 1');
 			$u->execute([':u' => $current_user_raw]);
 			$current_user = $u->fetch();
+			if ($current_user && $current_user['role'] === 'admin') {
+				$is_admin = true;
+			} elseif ($current_user) {
+				$mem_stmt = $pdo->prepare('SELECT club_id, role FROM club_memberships WHERE user_id = :id');
+				$mem_stmt->execute([':id' => $current_user['id']]);
+				foreach ($mem_stmt->fetchAll() as $row) {
+					$club_id = (int) $row['club_id'];
+					$member_clubs[] = $club_id;
+					if (in_array($row['role'], ['owner', 'club_officer'], true)) {
+						$managed_clubs[] = $club_id;
+					}
+				}
+				$member_clubs = array_values(array_unique($member_clubs));
+				$managed_clubs = array_values(array_unique($managed_clubs));
+			}
 		}
-		$stmt = $pdo->prepare('SELECT f.*, u.username, u.club_category AS creator_club FROM forms f JOIN users u ON u.id = f.creator_id WHERE f.id = :id LIMIT 1');
+		$stmt = $pdo->prepare('SELECT f.*, u.username, c.name AS club_name FROM forms f JOIN users u ON u.id = f.creator_id JOIN clubs c ON c.id = f.club_id WHERE f.id = :id LIMIT 1');
 		$stmt->execute([':id' => $form_id]);
 		$form = $stmt->fetch();
 
@@ -54,6 +87,29 @@ $status_labels = [
 	'published' => '已發布',
 	'closed' => '已關閉'
 ];
+
+$target_clubs = [];
+$can_submit = false;
+$access_message = '';
+if ($form) {
+	$can_submit = ($form['status'] === 'published');
+	if ($form['form_type'] === 'club_only') {
+		$target_clubs = parse_target_clubs($form['target_club_ids']);
+		if (!$current_user) {
+			$can_submit = false;
+			$access_message = '此表單僅限社團成員填寫，請先登入。';
+		} elseif (!$is_admin && empty(array_intersect($target_clubs, $member_clubs))) {
+			$can_submit = false;
+			$target_names = [];
+			foreach ($target_clubs as $cid) {
+				if (isset($club_map[$cid])) {
+					$target_names[] = $club_map[$cid];
+				}
+			}
+			$access_message = '此表單僅限 ' . ($target_names ? implode('、', $target_names) : '指定社團') . ' 成員填寫。';
+		}
+	}
+}
 ?>
 <!doctype html>
 <html lang="zh-Hant">
@@ -70,21 +126,7 @@ $status_labels = [
 		<link rel="stylesheet" href="/group_41/css/app.css" />
 	</head>
 	<body>
-		<header class="topbar">
-			<div class="container nav">
-				<a href="/group_41/index.php" class="brand">Club Form Studio</a>
-				<nav class="menu">
-					<a class="link-btn" href="/group_41/forms/list.php">表單列表</a>
-					<a class="link-btn" href="/group_41/forms/create.php">新增表單</a>
-					<?php if ($user) : ?>
-						<a class="btn btn-primary" href="/group_41/logout.php">登出</a>
-					<?php else : ?>
-						<a class="link-btn" href="/group_41/login.php">登入</a>
-						<a class="btn btn-primary" href="/group_41/register.php">註冊</a>
-					<?php endif; ?>
-				</nav>
-			</div>
-		</header>
+		<?php require __DIR__ . '/../includes/header.php'; ?>
 
 		<main class="section">
 			<div class="container">
@@ -103,9 +145,9 @@ $status_labels = [
 						$created_at = !empty($form['created_at']) ? date('Y-m-d', strtotime($form['created_at'])) : '';
 						$can_edit = false;
 						if ($current_user) {
-							if ($current_user['role'] === 'admin') {
+							if ($is_admin) {
 								$can_edit = true;
-							} elseif ($current_user['role'] === 'club_officer' && $form['creator_club'] === $current_user['club_category']) {
+							} elseif (in_array((int) $form['club_id'], $managed_clubs, true)) {
 								$can_edit = true;
 							}
 						}
@@ -117,11 +159,30 @@ $status_labels = [
 						<p class="meta">
 							出題者：<?php echo htmlspecialchars($form['username']); ?> ・ 狀態：<?php echo htmlspecialchars($status_label); ?> ・ 建立日：<?php echo htmlspecialchars($created_at); ?>
 						</p>
+						<?php if ($form['form_type'] === 'club_only') : ?>
+							<?php
+								$target_names = [];
+								foreach ($target_clubs as $cid) {
+									if (isset($club_map[$cid])) {
+										$target_names[] = $club_map[$cid];
+									}
+								}
+							?>
+							<p class="meta">限定社團：<?php echo htmlspecialchars($target_names ? implode('、', $target_names) : '未指定'); ?></p>
+						<?php endif; ?>
 						<div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap">
-							<?php if ($form['status'] === 'published') : ?>
+							<?php if ($can_submit) : ?>
 								<a class="btn btn-primary" href="/group_41/forms/submit.php?id=<?php echo $form_id; ?>">前往填寫</a>
 							<?php else : ?>
-								<span class="muted">此表單尚未發布</span>
+								<?php
+									$message = $access_message;
+									if ($form['status'] !== 'published') {
+										$message = '此表單尚未發布';
+									} elseif ($message === '') {
+										$message = '此表單目前無法填寫。';
+									}
+								?>
+								<span class="muted"><?php echo htmlspecialchars($message); ?></span>
 							<?php endif; ?>
 							<?php if ($can_edit) : ?>
 								<a class="btn btn-ghost" href="/group_41/forms/edit.php?id=<?php echo $form_id; ?>">修改表單</a>

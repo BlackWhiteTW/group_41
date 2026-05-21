@@ -5,11 +5,26 @@ require __DIR__ . '/../includes/db.php';
 
 $user_raw = isset($_SESSION['user']) ? $_SESSION['user'] : null;
 $user = !empty($user_raw) ? htmlspecialchars($user_raw) : null;
+$current_user = null;
+$is_admin = false;
+$member_clubs = [];
+$club_map = [];
 $form_id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 $form = null;
 $questions = [];
 $options_map = [];
 $errors = [];
+$target_clubs = [];
+
+function parse_target_clubs($value)
+{
+	if (!is_string($value) || trim($value) === '') {
+		return [];
+	}
+	$items = array_map('trim', explode(',', $value));
+	$items = array_values(array_filter($items, 'strlen'));
+	return array_values(array_unique(array_map('intval', $items)));
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	$form_id = isset($_POST['form_id']) ? (int) $_POST['form_id'] : 0;
@@ -18,6 +33,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 if ($form_id > 0) {
 	try {
 		$pdo = get_db();
+		$club_rows = $pdo->query('SELECT id, name FROM clubs')->fetchAll();
+		foreach ($club_rows as $club_row) {
+			$club_map[(int) $club_row['id']] = $club_row['name'];
+		}
+		if ($user_raw) {
+			$u = $pdo->prepare('SELECT id, username, role FROM users WHERE username = :u LIMIT 1');
+			$u->execute([':u' => $user_raw]);
+			$current_user = $u->fetch();
+			if ($current_user && $current_user['role'] === 'admin') {
+				$is_admin = true;
+			} elseif ($current_user) {
+				$mem_stmt = $pdo->prepare('SELECT club_id FROM club_memberships WHERE user_id = :id');
+				$mem_stmt->execute([':id' => $current_user['id']]);
+				$member_clubs = array_map('intval', array_column($mem_stmt->fetchAll(), 'club_id'));
+			}
+		}
 		$stmt = $pdo->prepare('SELECT f.*, u.username FROM forms f JOIN users u ON u.id = f.creator_id WHERE f.id = :id LIMIT 1');
 		$stmt->execute([':id' => $form_id]);
 		$form = $stmt->fetch();
@@ -40,6 +71,21 @@ if ($form_id > 0) {
 		}
 	} catch (Throwable $e) {
 		$errors[] = '表單資料載入失敗，請稍後再試。';
+	}
+}
+
+if ($form && empty($errors) && $form['form_type'] === 'club_only') {
+	$target_clubs = parse_target_clubs($form['target_club_ids']);
+	if (!$current_user) {
+		$errors[] = '此表單僅限社團成員填寫，請先登入。';
+	} elseif (!$is_admin && empty(array_intersect($target_clubs, $member_clubs))) {
+		$target_names = [];
+		foreach ($target_clubs as $cid) {
+			if (isset($club_map[$cid])) {
+				$target_names[] = $club_map[$cid];
+			}
+		}
+		$errors[] = '此表單僅限 ' . ($target_names ? implode('、', $target_names) : '指定社團') . ' 成員填寫。';
 	}
 }
 
@@ -176,21 +222,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $form && empty($errors)) {
 		<link rel="stylesheet" href="/group_41/css/app.css" />
 	</head>
 	<body>
-		<header class="topbar">
-			<div class="container nav">
-				<a href="/group_41/index.php" class="brand">Club Form Studio</a>
-				<nav class="menu">
-					<a class="link-btn" href="/group_41/forms/list.php">表單列表</a>
-					<a class="link-btn" href="/group_41/forms/create.php">新增表單</a>
-					<?php if ($user) : ?>
-						<a class="btn btn-primary" href="/group_41/logout.php">登出</a>
-					<?php else : ?>
-						<a class="link-btn" href="/group_41/login.php">登入</a>
-						<a class="btn btn-primary" href="/group_41/register.php">註冊</a>
-					<?php endif; ?>
-				</nav>
-			</div>
-		</header>
+		<?php require __DIR__ . '/../includes/header.php'; ?>
 
 		<main class="section">
 			<div class="container">
@@ -204,7 +236,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $form && empty($errors)) {
 						</ul>
 					</div>
 				<?php endif; ?>
-				<?php if (!$form) : ?>
+				<?php if (!empty($errors)) : ?>
+					<div class="panel" style="padding: 20px">
+						<a class="btn btn-ghost" href="/group_41/forms/list.php">返回列表</a>
+					</div>
+				<?php elseif (!$form) : ?>
 					<div class="panel" style="padding: 20px">
 						<p class="muted">找不到指定的表單。</p>
 						<a class="btn btn-ghost" href="/group_41/forms/list.php">返回列表</a>

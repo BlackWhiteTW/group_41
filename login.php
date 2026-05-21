@@ -14,7 +14,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	} else {
 		$auth_user = login_authenticate($username, $password);
 		if ($auth_user) {
-			$_SESSION['user'] = $auth_user['username'];
+				// 安全：重新產生 session id，並設定最後活動時間以支援閒置自動登出
+				session_regenerate_id(true);
+				$_SESSION['user'] = $auth_user['username'];
+				$_SESSION['last_activity'] = time();
+				// 固定啟用「記住功能」：設定記住 cookie 並延長 session cookie 的到期時間（1 小時）
+				$ttl = 3600; // 1 小時
+				setcookie('remember_active', '1', time() + $ttl, '/');
+				setcookie(session_name(), session_id(), time() + $ttl, '/', '', false, true);
 			header('Location: /group_41/index.php');
 			exit();
 		}
@@ -30,25 +37,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width,initial-scale=1" />
 		<title>登入 | 社團表單系統</title>
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700&display=swap"
+			rel="stylesheet"
+		/>
 		<link rel="stylesheet" href="/group_41/css/app.css" />
 	</head>
 	<body>
-		<header class="topbar">
-			<div class="container nav">
-				<a class="brand" href="/group_41/index.php">Club Form Studio</a>
-				<nav class="menu">
-					<a class="link-btn" href="/group_41/index.php">首頁</a>
-					<a class="link-btn" href="/group_41/forms/list.php">表單列表</a>
-					<a class="link-btn" href="/group_41/forms/create.php">新增表單</a>
-					<?php if ($user) : ?>
-						<a class="btn btn-primary" href="/group_41/logout.php">登出</a>
-					<?php else : ?>
-						<a class="link-btn" href="/group_41/login.php">登入</a>
-						<a class="btn btn-primary" href="/group_41/register.php">註冊</a>
-					<?php endif; ?>
-				</nav>
-			</div>
-		</header>
+		<?php require __DIR__ . '/includes/header.php'; ?>
 
 		<main class="form-page">
 			<section class="form-card">

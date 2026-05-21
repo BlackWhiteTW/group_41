@@ -6,20 +6,59 @@ require __DIR__ . '/../includes/db.php';
 $user = !empty($_SESSION['user']) ? htmlspecialchars($_SESSION['user']) : null;
 $current_user_raw = isset($_SESSION['user']) ? $_SESSION['user'] : null;
 $current_user = null;
+$is_admin = false;
+$member_clubs = [];
+$managed_clubs = [];
+$club_map = [];
 $forms = [];
 $load_error = null;
 
 try {
 	$pdo = get_db();
+	$club_rows = $pdo->query('SELECT id, name FROM clubs ORDER BY name ASC')->fetchAll();
+	foreach ($club_rows as $club_row) {
+		$club_map[(int) $club_row['id']] = $club_row['name'];
+	}
 	if ($current_user_raw) {
-		$u = $pdo->prepare('SELECT id, username, role, club_category FROM users WHERE username = :u LIMIT 1');
+		$u = $pdo->prepare('SELECT id, username, role FROM users WHERE username = :u LIMIT 1');
 		$u->execute([':u' => $current_user_raw]);
 		$current_user = $u->fetch();
+		if ($current_user && $current_user['role'] === 'admin') {
+			$is_admin = true;
+		} elseif ($current_user) {
+			$mem_stmt = $pdo->prepare('SELECT club_id, role FROM club_memberships WHERE user_id = :id');
+			$mem_stmt->execute([':id' => $current_user['id']]);
+			foreach ($mem_stmt->fetchAll() as $row) {
+				$club_id = (int) $row['club_id'];
+				$member_clubs[] = $club_id;
+				if (in_array($row['role'], ['owner', 'club_officer'], true)) {
+					$managed_clubs[] = $club_id;
+				}
+			}
+			$member_clubs = array_values(array_unique($member_clubs));
+			$managed_clubs = array_values(array_unique($managed_clubs));
+		}
 	}
-	$stmt = $pdo->query('SELECT f.id, f.title, f.description, f.form_type, f.status, f.created_at, u.username, u.club_category AS creator_club FROM forms f JOIN users u ON u.id = f.creator_id ORDER BY f.created_at DESC');
+	$stmt = $pdo->query('SELECT f.id, f.title, f.description, f.form_type, f.status, f.created_at, f.club_id, f.target_club_ids, u.username, c.name AS club_name FROM forms f JOIN users u ON u.id = f.creator_id JOIN clubs c ON c.id = f.club_id ORDER BY f.created_at DESC');
 	$forms = $stmt->fetchAll();
 } catch (Throwable $e) {
 	$load_error = '表單資料載入失敗，請稍後再試。';
+}
+
+if (empty($load_error) && !$is_admin) {
+	$forms = array_values(array_filter($forms, function ($form) use ($current_user, $member_clubs) {
+		if ($form['form_type'] === 'public') {
+			return true;
+		}
+		if ($form['form_type'] === 'club_only') {
+			if (!$current_user) {
+				return false;
+			}
+			$target_ids = parse_target_clubs($form['target_club_ids']);
+			return !empty(array_intersect($target_ids, $member_clubs));
+		}
+		return false;
+	}));
 }
 
 $type_labels = [
@@ -31,6 +70,16 @@ $status_labels = [
 	'published' => '已發布',
 	'closed' => '已關閉'
 ];
+
+function parse_target_clubs($value)
+{
+	if (!is_string($value) || trim($value) === '') {
+		return [];
+	}
+	$items = array_map('trim', explode(',', $value));
+	$items = array_values(array_filter($items, 'strlen'));
+	return array_values(array_unique(array_map('intval', $items)));
+}
 ?>
 <!doctype html>
 <html lang="zh-Hant">
@@ -47,21 +96,7 @@ $status_labels = [
 		<link rel="stylesheet" href="/group_41/css/app.css" />
 	</head>
 	<body>
-		<header class="topbar">
-			<div class="container nav">
-				<a href="/group_41/index.php" class="brand">Club Form Studio</a>
-				<nav class="menu">
-					<a class="link-btn" href="/group_41/forms/list.php">表單列表</a>
-					<a class="link-btn" href="/group_41/forms/create.php">新增表單</a>
-					<?php if ($user) : ?>
-						<a class="btn btn-primary" href="/group_41/logout.php">登出</a>
-					<?php else : ?>
-						<a class="link-btn" href="/group_41/login.php">登入</a>
-						<a class="btn btn-primary" href="/group_41/register.php">註冊</a>
-					<?php endif; ?>
-				</nav>
-			</div>
-		</header>
+		<?php require __DIR__ . '/../includes/header.php'; ?>
 
 		<main class="section">
 			<div class="container">
@@ -85,11 +120,27 @@ $status_labels = [
 								$status_label = isset($status_labels[$form['status']]) ? $status_labels[$form['status']] : $form['status'];
 								$created_at = !empty($form['created_at']) ? date('Y-m-d', strtotime($form['created_at'])) : '';
 								$can_edit = false;
-								if ($current_user) {
-									if ($current_user['role'] === 'admin') {
-										$can_edit = true;
-									} elseif ($current_user['role'] === 'club_officer' && $current_user['club_category'] === $form['creator_club']) {
-										$can_edit = true;
+								$can_submit = ($form['status'] === 'published');
+								$club_notice = '';
+								if ($is_admin) {
+									$can_edit = true;
+								} elseif ($current_user && in_array((int) $form['club_id'], $managed_clubs, true)) {
+									$can_edit = true;
+								}
+								if ($form['form_type'] === 'club_only') {
+									$target_ids = parse_target_clubs($form['target_club_ids']);
+									if (!$current_user) {
+										$can_submit = false;
+										$club_notice = '限定社團，請先登入';
+									} elseif (!$is_admin && empty(array_intersect($target_ids, $member_clubs))) {
+										$can_submit = false;
+										$target_names = [];
+										foreach ($target_ids as $cid) {
+											if (isset($club_map[$cid])) {
+												$target_names[] = $club_map[$cid];
+											}
+										}
+										$club_notice = '限定社團：' . ($target_names ? implode('、', $target_names) : '指定社團');
 									}
 								}
 							?>
@@ -103,7 +154,11 @@ $status_labels = [
 								<div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap">
 									<a class="btn btn-primary" href="/group_41/forms/view.php?id=<?php echo (int) $form['id']; ?>">查看表單</a>
 									<?php if ($form['status'] === 'published') : ?>
-										<a class="btn btn-ghost" href="/group_41/forms/submit.php?id=<?php echo (int) $form['id']; ?>">前往填寫</a>
+										<?php if ($can_submit) : ?>
+											<a class="btn btn-ghost" href="/group_41/forms/submit.php?id=<?php echo (int) $form['id']; ?>">前往填寫</a>
+										<?php else : ?>
+											<span class="muted"><?php echo htmlspecialchars($club_notice ?: '此表單目前無法填寫'); ?></span>
+										<?php endif; ?>
 									<?php endif; ?>
 									<?php if ($can_edit) : ?>
 										<a class="btn btn-ghost" href="/group_41/forms/edit.php?id=<?php echo (int) $form['id']; ?>">修改表單</a>

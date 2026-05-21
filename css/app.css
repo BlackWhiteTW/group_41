@@ -265,6 +265,10 @@ textarea {
   font: inherit;
 }
 
+select[multiple] {
+  min-height: 140px;
+}
+
 input[type="checkbox"],
 input[type="radio"] {
   width: auto;

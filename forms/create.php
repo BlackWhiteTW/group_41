@@ -1,4 +1,5 @@
 <?php
+// 表單建立頁面：提供表單內容輸入、題目設定和驗證，提交後儲存到資料庫
 session_start();
 require __DIR__ . '/../includes/db.php';
 
@@ -8,7 +9,9 @@ $user = !empty($user_raw) ? htmlspecialchars($user_raw) : null;
 $errors = [];
 $current_user = null;
 $club_options = [];
-$allowed_clubs = [];
+$club_map = [];
+$managed_clubs = [];
+$member_clubs = [];
 $all_clubs = [];
 $can_select_any = false;
 $form_id = null;
@@ -16,7 +19,8 @@ $defaults = [
 	'title' => '',
 	'description' => '',
 	'form_type' => 'public',
-	'target_club_category' => [],
+	'club_id' => 0,
+	'target_club_ids' => [],
 	'status' => 'draft'
 ];
 $question_defaults = [];
@@ -27,26 +31,37 @@ $allowed_status = ['draft', 'published', 'closed'];
 if (!empty($user_raw)) {
 	try {
 		$pdo = get_db();
-		$u = $pdo->prepare('SELECT id, username, role, club_category FROM users WHERE username = :u LIMIT 1');
+		$u = $pdo->prepare('SELECT id, username, role FROM users WHERE username = :u LIMIT 1');
 		$u->execute([':u' => $user_raw]);
 		$current_user = $u->fetch();
 
-		$club_stmt = $pdo->query('SELECT name FROM clubs ORDER BY name ASC');
-		$all_clubs = array_column($club_stmt->fetchAll(), 'name');
+		$club_stmt = $pdo->query('SELECT id, name FROM clubs ORDER BY name ASC');
+		$all_clubs = $club_stmt->fetchAll();
+		foreach ($all_clubs as $club_row) {
+			$club_map[(int) $club_row['id']] = $club_row['name'];
+		}
 
 		if ($current_user) {
 			if ($current_user['role'] === 'admin') {
 				$can_select_any = true;
 				$club_options = $all_clubs;
+				$managed_clubs = array_keys($club_map);
 			} else {
-				if (!empty($current_user['club_category'])) {
-					$allowed_clubs[] = $current_user['club_category'];
+				$mem_stmt = $pdo->prepare('SELECT club_id, role FROM club_memberships WHERE user_id = :id');
+				$mem_stmt->execute([':id' => $current_user['id']]);
+				foreach ($mem_stmt->fetchAll() as $row) {
+					$club_id = (int) $row['club_id'];
+					$member_clubs[] = $club_id;
+					if (in_array($row['role'], ['owner', 'club_officer'], true)) {
+						$managed_clubs[] = $club_id;
+					}
 				}
-				$owned_stmt = $pdo->prepare('SELECT name FROM clubs WHERE owner_user_id = :id');
-				$owned_stmt->execute([':id' => $current_user['id']]);
-				$owned_clubs = array_column($owned_stmt->fetchAll(), 'name');
-				$allowed_clubs = array_values(array_unique(array_merge($allowed_clubs, $owned_clubs)));
-				$club_options = $allowed_clubs;
+				$managed_clubs = array_values(array_unique($managed_clubs));
+				foreach ($all_clubs as $club_row) {
+					if (in_array((int) $club_row['id'], $managed_clubs, true)) {
+						$club_options[] = $club_row;
+					}
+				}
 			}
 		}
 	} catch (Throwable $e) {
@@ -54,20 +69,38 @@ if (!empty($user_raw)) {
 	}
 }
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST' && !$can_select_any && empty($defaults['target_club_category']) && !empty($club_options)) {
-	$defaults['target_club_category'] = [$club_options[0]];
+if (empty($errors) && $current_user && !$can_select_any && empty($managed_clubs)) {
+	$errors[] = '只有社團幹部或持有人可以建立表單。';
+}
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST' && $defaults['club_id'] === 0) {
+	if ($can_select_any && !empty($all_clubs)) {
+		$defaults['club_id'] = (int) $all_clubs[0]['id'];
+	} elseif (!empty($managed_clubs)) {
+		$defaults['club_id'] = (int) $managed_clubs[0];
+	}
+}
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST' && $defaults['form_type'] === 'club_only') {
+	if ($can_select_any) {
+		$defaults['target_club_ids'] = $defaults['club_id'] ? [$defaults['club_id']] : [];
+	} else {
+		$defaults['target_club_ids'] = $defaults['club_id'] ? [$defaults['club_id']] : [];
+	}
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	$defaults['title'] = trim(isset($_POST['title']) ? $_POST['title'] : '');
 	$defaults['description'] = trim(isset($_POST['description']) ? $_POST['description'] : '');
 	$defaults['form_type'] = isset($_POST['form_type']) ? $_POST['form_type'] : 'public';
-	$target_input = isset($_POST['target_club_category']) ? $_POST['target_club_category'] : [];
+	$defaults['club_id'] = isset($_POST['club_id']) ? (int) $_POST['club_id'] : 0;
+	$target_input = isset($_POST['target_club_ids']) ? $_POST['target_club_ids'] : [];
 	if (!is_array($target_input)) {
 		$target_input = [$target_input];
 	}
 	$target_input = array_values(array_filter(array_map('trim', $target_input), 'strlen'));
-	$defaults['target_club_category'] = $target_input;
+	$target_input = array_values(array_unique(array_map('intval', $target_input)));
+	$defaults['target_club_ids'] = $target_input;
 	$defaults['status'] = isset($_POST['status']) ? $_POST['status'] : 'draft';
 
 	$questions_input = (isset($_POST['questions']) && is_array($_POST['questions'])) ? $_POST['questions'] : [];
@@ -104,33 +137,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	if (!in_array($defaults['status'], $allowed_status, true)) {
 		$defaults['status'] = 'draft';
 	}
-	if ($defaults['form_type'] === 'club_only' && empty($defaults['target_club_category'])) {
-		$errors[] = '限定社團表單請選擇社團。';
+	if ($defaults['club_id'] === 0) {
+		$errors[] = '請選擇發布社團。';
+	} elseif (!isset($club_map[$defaults['club_id']])) {
+		$errors[] = '發布社團不存在。';
 	}
+	if (!$can_select_any && !empty($managed_clubs) && $defaults['club_id'] !== 0 && !in_array($defaults['club_id'], $managed_clubs, true)) {
+		$errors[] = '你只能選擇自己擔任幹部或持有人的社團。';
+		$defaults['club_id'] = (int) $managed_clubs[0];
+	}
+
 	if ($defaults['form_type'] === 'club_only') {
 		if ($can_select_any) {
-			foreach ($defaults['target_club_category'] as $club_name) {
-				if (!in_array($club_name, $club_options, true)) {
-					$errors[] = '請選擇有效的社團。';
-					break;
+			if (empty($defaults['target_club_ids'])) {
+				$errors[] = '限定社團表單請選擇社團。';
+			} else {
+				foreach ($defaults['target_club_ids'] as $club_id) {
+					if (!isset($club_map[$club_id])) {
+						$errors[] = '請選擇有效的社團。';
+						break;
+					}
 				}
 			}
 		} else {
-			if (empty($club_options)) {
-				$errors[] = '你尚未綁定任何社團，無法建立限定社團表單。';
-			} else {
-				$allowed = array_values(array_intersect($defaults['target_club_category'], $club_options));
-				if (empty($allowed)) {
-					$defaults['target_club_category'] = [$club_options[0]];
-					$errors[] = '社團管理員只能選擇自己的社團。';
-				} else {
-					if (count($allowed) > 1) {
-						$errors[] = '社團管理員一次只能選擇一個社團。';
-					}
-					$defaults['target_club_category'] = [$allowed[0]];
-				}
+			if ($defaults['club_id'] !== 0) {
+				$defaults['target_club_ids'] = [$defaults['club_id']];
 			}
 		}
+	} else {
+		$defaults['target_club_ids'] = [];
 	}
 
 	$valid_questions = [];
@@ -168,14 +203,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 				throw new RuntimeException('找不到登入者資訊。');
 			}
 
-			$target_club = ($defaults['form_type'] === 'club_only') ? implode(',', $defaults['target_club_category']) : null;
-			$f = $pdo->prepare('INSERT INTO forms (creator_id, title, description, form_type, target_club_category, status) VALUES (:c, :t, :d, :ft, :tc, :s)');
+			$target_club_ids = ($defaults['form_type'] === 'club_only') ? implode(',', $defaults['target_club_ids']) : null;
+			$f = $pdo->prepare('INSERT INTO forms (creator_id, club_id, title, description, form_type, target_club_ids, status) VALUES (:c, :club, :t, :d, :ft, :tc, :s)');
 			$f->execute([
 				':c' => $user_row['id'],
+				':club' => $defaults['club_id'],
 				':t' => $defaults['title'],
 				':d' => $defaults['description'] ?: null,
 				':ft' => $defaults['form_type'],
-				':tc' => $target_club,
+				':tc' => $target_club_ids,
 				':s' => $defaults['status']
 			]);
 			$form_id = (int) $pdo->lastInsertId();
@@ -237,21 +273,7 @@ if (empty($question_defaults)) {
 		<link rel="stylesheet" href="/group_41/css/app.css" />
 	</head>
 	<body>
-		<header class="topbar">
-			<div class="container nav">
-				<a href="/group_41/index.php" class="brand">Club Form Studio</a>
-				<nav class="menu">
-					<a class="link-btn" href="/group_41/forms/list.php">表單列表</a>
-					<a class="link-btn" href="/group_41/forms/create.php">新增表單</a>
-					<?php if ($user) : ?>
-						<a class="btn btn-primary" href="/group_41/logout.php">登出</a>
-					<?php else : ?>
-						<a class="link-btn" href="/group_41/login.php">登入</a>
-						<a class="btn btn-primary" href="/group_41/register.php">註冊</a>
-					<?php endif; ?>
-				</nav>
-			</div>
-		</header>
+		<?php require __DIR__ . '/../includes/header.php'; ?>
 
 		<main class="section">
 			<div class="container">
@@ -279,6 +301,21 @@ if (empty($question_defaults)) {
 						<textarea id="description" name="description" rows="3"><?php echo htmlspecialchars($defaults['description']); ?></textarea>
 					</div>
 					<div class="field">
+						<label for="club_id">發布社團</label>
+						<?php if (!empty($club_options)) : ?>
+							<select id="club_id" name="club_id">
+								<?php foreach ($club_options as $club_row) : ?>
+									<option value="<?php echo (int) $club_row['id']; ?>" <?php echo $defaults['club_id'] === (int) $club_row['id'] ? 'selected' : ''; ?>>
+										<?php echo htmlspecialchars($club_row['name']); ?>
+									</option>
+								<?php endforeach; ?>
+							</select>
+						<?php else : ?>
+							<input id="club_id" name="club_id" placeholder="尚無可選社團" disabled />
+						<?php endif; ?>
+						<p class="muted" style="margin-top: 6px">需為該社團幹部或持有人才能建立表單。</p>
+					</div>
+					<div class="field">
 						<label for="form_type">表單類型</label>
 						<select id="form_type" name="form_type">
 							<option value="public" <?php echo $defaults['form_type'] === 'public' ? 'selected' : ''; ?>>公開表單</option>
@@ -286,28 +323,23 @@ if (empty($question_defaults)) {
 						</select>
 					</div>
 					<div class="field" id="targetClubWrap">
-						<label for="target_club_category">限定社團名稱</label>
+						<label for="target_club_ids">限定社團名稱</label>
 						<?php if ($can_select_any && !empty($all_clubs)) : ?>
-							<select id="target_club_category" name="target_club_category[]" multiple size="6">
+							<select id="target_club_ids" name="target_club_ids[]" multiple size="6">
 								<option value="">請選擇</option>
-								<?php foreach ($club_options as $club_name) : ?>
-									<option value="<?php echo htmlspecialchars($club_name); ?>" <?php echo in_array($club_name, $defaults['target_club_category'], true) ? 'selected' : ''; ?>>
-										<?php echo htmlspecialchars($club_name); ?>
+								<?php foreach ($all_clubs as $club_row) : ?>
+									<option value="<?php echo (int) $club_row['id']; ?>" <?php echo in_array((int) $club_row['id'], $defaults['target_club_ids'], true) ? 'selected' : ''; ?>>
+										<?php echo htmlspecialchars($club_row['name']); ?>
 									</option>
 								<?php endforeach; ?>
 							</select>
+							<p class="muted" style="margin-top: 6px">管理員可多選（Ctrl/Command）。</p>
 						<?php elseif (!empty($club_options)) : ?>
-							<select id="target_club_category" name="target_club_category[]">
-								<?php foreach ($club_options as $club_name) : ?>
-									<option value="<?php echo htmlspecialchars($club_name); ?>" <?php echo in_array($club_name, $defaults['target_club_category'], true) ? 'selected' : ''; ?>>
-										<?php echo htmlspecialchars($club_name); ?>
-									</option>
-								<?php endforeach; ?>
-							</select>
+							<input id="target_club_ids" name="target_club_ids" value="<?php echo htmlspecialchars($club_map[$defaults['club_id']] ?? ''); ?>" readonly />
+							<p class="muted" style="margin-top: 6px">限定社團將使用發布社團。</p>
 						<?php else : ?>
-							<input id="target_club_category" name="target_club_category" placeholder="尚無可選社團" disabled />
+							<input id="target_club_ids" name="target_club_ids" placeholder="尚無可選社團" disabled />
 						<?php endif; ?>
-						<p class="muted" style="margin-top: 6px">幹部/社團持有人只能選擇自己的社團，管理員可多選（Ctrl/Command）。</p>
 					</div>
 					<div class="field">
 						<label for="status">狀態</label>
