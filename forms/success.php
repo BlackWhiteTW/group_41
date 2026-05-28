@@ -16,10 +16,10 @@ $submission_id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 			href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700&display=swap"
 			rel="stylesheet"
 		/>
-		<link rel="stylesheet" href="/group_41/css/app.css" />
+		<link rel="stylesheet" href="../css/app.css" />
 	</head>
 	<body>
-		<?php require __DIR__ . '/../includes/header.php'; ?>
+		<?php $base_url = '../'; require '../includes/header.php'; ?>
 
 		<main class="section">
 			<div class="container">
@@ -30,15 +30,15 @@ $submission_id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 						<p class="muted">送出編號：<?php echo $submission_id; ?></p>
 					<?php endif; ?>
 					<div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap">
-						<a class="btn btn-primary" href="/group_41/forms/list.php">返回表單列表</a>
-						<a class="btn btn-ghost" href="/group_41/index.php">回首頁</a>
+						<a class="btn btn-primary" href="./list.php">返回表單列表</a>
+						<a class="btn btn-ghost" href="../index.php">回首頁</a>
 					</div>
 				</div>
 			</div>
 		</main>
 
 		<footer class="footer container">社團表單系統</footer>
-		<script src="/group_41/js/app.js"></script>
+		<script src="../js/app.js"></script>
 	</body>
 </html>
 

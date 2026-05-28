@@ -1,9 +1,9 @@
 <?php
-// PDO 連線設定（預設 XAMPP MySQL: root / 空密碼）
+// PDO 連線設定（root / root123456）
 $host = '127.0.0.1';
 $db   = 'group_41';
 $user = 'root';
-$pass = '';
+$pass = 'root123456';
 $charset = 'utf8mb4';
 
 $dsn = "mysql:host=$host;dbname=$db;charset=$charset";

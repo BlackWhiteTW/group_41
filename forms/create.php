@@ -1,7 +1,7 @@
 <?php
 // 表單建立頁面：提供表單內容輸入、題目設定和驗證，提交後儲存到資料庫
 session_start();
-require __DIR__ . '/../includes/db.php';
+require '../includes/db.php';
 
 $user_raw = isset($_SESSION['user']) ? $_SESSION['user'] : null;
 $user = !empty($user_raw) ? htmlspecialchars($user_raw) : null;
@@ -238,7 +238,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 				}
 			}
 			$pdo->commit();
-			header('Location: /group_41/forms/view.php?id=' . $form_id);
+			header('Location: ./forms/view.php?id=' . $form_id);
 			exit();
 		} catch (Throwable $e) {
 			if (!empty($pdo) && $pdo->inTransaction()) {
@@ -270,10 +270,10 @@ if (empty($question_defaults)) {
 			href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700&display=swap"
 			rel="stylesheet"
 		/>
-		<link rel="stylesheet" href="/group_41/css/app.css" />
+		<link rel="stylesheet" href="../css/app.css" />
 	</head>
 	<body>
-		<?php require __DIR__ . '/../includes/header.php'; ?>
+		<?php $base_url = '../'; require '../includes/header.php'; ?>
 
 		<main class="section">
 			<div class="container">
@@ -291,7 +291,7 @@ if (empty($question_defaults)) {
 						</ul>
 					</div>
 				<?php endif; ?>
-				<form class="panel" style="padding: 20px" method="post" action="/group_41/forms/create.php">
+				<form class="panel" style="padding: 20px" method="post" action="./create.php">
 					<div class="field">
 						<label for="title">表單標題</label>
 						<input id="title" name="title" required value="<?php echo htmlspecialchars($defaults['title']); ?>" />
@@ -436,14 +436,14 @@ if (empty($question_defaults)) {
 
 					<div style="margin-top: 20px">
 						<button class="btn btn-primary" type="submit" <?php echo empty($user_raw) ? 'disabled' : ''; ?>>建立表單</button>
-						<a class="btn btn-ghost" href="/group_41/forms/list.php">回表單列表</a>
+						<a class="btn btn-ghost" href="./list.php">回表單列表</a>
 					</div>
 				</form>
 			</div>
 		</main>
 
 		<footer class="footer container">社團表單系統</footer>
-		<script src="/group_41/js/app.js"></script>
+		<script src="./js/app.js"></script>
 	</body>
 </html>
 

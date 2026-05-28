@@ -2,11 +2,11 @@
 // 安裝腳本（管理區）：執行 database.sql 以建立資料表（僅限管理員使用）
 session_start();
 
-require __DIR__ . '/../includes/db.php';
+require '../includes/db.php';
 
 $user_raw = isset($_SESSION['user']) ? $_SESSION['user'] : null;
 if (empty($user_raw)) {
-    header('Location: /group_41/login.php');
+    header('Location: ../login.php');
     exit();
 }
 
@@ -18,7 +18,7 @@ $current_user = $u->fetch();
 
 if (!$current_user || $current_user['role'] !== 'admin') {
     $_SESSION['flash_error'] = '需要管理員權限才能執行安裝程序。';
-    header('Location: /group_41/index.php');
+    header('Location: ../index.php');
     exit();
 }
 
@@ -34,7 +34,7 @@ $status = isset($status) ? $status : 'info';
 $ready = isset($ready) ? $ready : true;
 
 if ($ready) {
-    $sql_file = __DIR__ . '/../database.sql';
+    $sql_file = '../database.sql';
     if (!file_exists($sql_file)) {
         $message = '找不到 database.sql';
         $status = 'error';
@@ -78,10 +78,10 @@ if ($ready) {
             href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700&display=swap"
             rel="stylesheet"
         />
-        <link rel="stylesheet" href="/group_41/css/app.css" />
+        <link rel="stylesheet" href="../css/app.css" />
     </head>
     <body>
-        <?php require __DIR__ . '/../includes/header.php'; ?>
+        <?php $base_url = '../'; require '../includes/header.php'; ?>
 
         <main class="section">
             <div class="container">
@@ -93,9 +93,9 @@ if ($ready) {
                     <div class="panel" style="padding: 20px">
                         <p class="muted"><?php echo htmlspecialchars($message); ?></p>
                         <div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap">
-                            <a class="btn btn-ghost" href="/group_41/admin/">返回控制台</a>
+                            <a class="btn btn-ghost" href="./">返回控制台</a>
                             <?php if ($status !== 'success') : ?>
-                                <a class="btn btn-primary" href="/group_41/admin/install.php?confirm=1">再次執行</a>
+                                <a class="btn btn-primary" href="./install.php?confirm=1">再次執行</a>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -104,7 +104,7 @@ if ($ready) {
         </main>
 
         <footer class="footer container">社團表單系統</footer>
-        <script src="/group_41/js/app.js"></script>
+        <script src="../js/app.js"></script>
     </body>
 </html>
 

@@ -17,6 +17,9 @@ if (!defined('FUNCTIONS_LOADED')) {
         if (!is_logged_in()) {
             return null;
         }
+        if (!$pdo) {
+            return null;
+        }
         
         $sql = "SELECT id, username, email, club_category, role FROM users WHERE id = ?";
         $stmt = $pdo->prepare($sql);
@@ -37,7 +40,7 @@ if (!defined('FUNCTIONS_LOADED')) {
 
     // 重定向到登入頁
     function redirect_to_login() {
-        header('Location: /group_41/login.php');
+        header('Location: ../../../login.php');
         exit();
     }
 
@@ -82,7 +85,7 @@ if (!defined('FUNCTIONS_LOADED')) {
 
     // 模板渲染：把畫面檔案移到 templates，控制器只保留邏輯。
     function render_template($template_path, array $data = []) {
-        $base_path = $_SERVER['DOCUMENT_ROOT'] . '/group_41/templates/';
+        $base_path = '../templates/';
         $full_path = $base_path . ltrim($template_path, '/');
 
         if (!file_exists($full_path)) {

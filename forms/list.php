@@ -1,7 +1,7 @@
 <?php
 session_start();
 
-require __DIR__ . '/../includes/db.php';
+require '../includes/db.php';
 
 $user = !empty($_SESSION['user']) ? htmlspecialchars($_SESSION['user']) : null;
 $current_user_raw = isset($_SESSION['user']) ? $_SESSION['user'] : null;
@@ -93,10 +93,10 @@ function parse_target_clubs($value)
 			href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700&display=swap"
 			rel="stylesheet"
 		/>
-		<link rel="stylesheet" href="/group_41/css/app.css" />
+		<link rel="stylesheet" href="../css/app.css" />
 	</head>
 	<body>
-		<?php require __DIR__ . '/../includes/header.php'; ?>
+		<?php $base_url = '../'; require '../includes/header.php'; ?>
 
 		<main class="section">
 			<div class="container">
@@ -110,7 +110,7 @@ function parse_target_clubs($value)
 				<?php elseif (empty($forms)) : ?>
 					<div class="panel" style="padding: 20px">
 						<p class="muted">目前尚無表單，請先建立表單。</p>
-						<a class="btn btn-primary" href="/group_41/forms/create.php">建立新表單</a>
+						<a class="btn btn-primary" href="./create.php">建立新表單</a>
 					</div>
 				<?php else : ?>
 					<div class="card-grid">
@@ -152,16 +152,16 @@ function parse_target_clubs($value)
 									出題者：<?php echo htmlspecialchars($form['username']); ?> ・ 狀態：<?php echo htmlspecialchars($status_label); ?> ・ 建立日：<?php echo htmlspecialchars($created_at); ?>
 								</p>
 								<div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap">
-									<a class="btn btn-primary" href="/group_41/forms/view.php?id=<?php echo (int) $form['id']; ?>">查看表單</a>
+									<a class="btn btn-primary" href="./view.php?id=<?php echo (int) $form['id']; ?>">查看表單</a>
 									<?php if ($form['status'] === 'published') : ?>
 										<?php if ($can_submit) : ?>
-											<a class="btn btn-ghost" href="/group_41/forms/submit.php?id=<?php echo (int) $form['id']; ?>">前往填寫</a>
+											<a class="btn btn-ghost" href="./submit.php?id=<?php echo (int) $form['id']; ?>">前往填寫</a>
 										<?php else : ?>
 											<span class="muted"><?php echo htmlspecialchars($club_notice ?: '此表單目前無法填寫'); ?></span>
 										<?php endif; ?>
 									<?php endif; ?>
 									<?php if ($can_edit) : ?>
-										<a class="btn btn-ghost" href="/group_41/forms/edit.php?id=<?php echo (int) $form['id']; ?>">修改表單</a>
+										<a class="btn btn-ghost" href="./edit.php?id=<?php echo (int) $form['id']; ?>">修改表單</a>
 									<?php else : ?>
 										<?php if ($form['status'] !== 'published') : ?>
 											<span class="muted">尚未發布</span>
@@ -176,7 +176,7 @@ function parse_target_clubs($value)
 		</main>
 
 		<footer class="footer container">社團表單系統</footer>
-		<script src="/group_41/js/app.js"></script>
+		<script src="../js/app.js"></script>
 	</body>
 </html>
 

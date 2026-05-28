@@ -1,4 +1,7 @@
--- 清除舊的表與數據庫
+-- 數據庫初始化腳本
+-- root / root123456
+
+-- 檢查是否存在 group_41 數據庫，存在則刪除
 DROP DATABASE IF EXISTS group_41;
 CREATE DATABASE group_41 CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE group_41;

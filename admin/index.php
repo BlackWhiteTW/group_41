@@ -1,7 +1,7 @@
 <?php
 session_start();
 
-require __DIR__ . '/../includes/db.php';
+require '../includes/db.php';
 
 $user_raw = isset($_SESSION['user']) ? $_SESSION['user'] : null;
 $user = !empty($user_raw) ? htmlspecialchars($user_raw) : null;
@@ -14,8 +14,8 @@ $stats = [
     'submissions' => 0
 ];
 
-if (empty($user_raw)) {
-    header('Location: /group_41/login.php');
+    if (empty($user_raw)) {
+    header('Location: ../login.php');
     exit();
 }
 
@@ -26,7 +26,7 @@ try {
     $current_user = $u->fetch();
     if (!$current_user || $current_user['role'] !== 'admin') {
         $_SESSION['flash_error'] = '需要管理員權限才能進入管理介面。';
-        header('Location: /group_41/index.php');
+        header('Location: ../index.php');
         exit();
     }
 
@@ -50,10 +50,10 @@ try {
             href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700&display=swap"
             rel="stylesheet"
         />
-        <link rel="stylesheet" href="/group_41/css/app.css" />
+        <link rel="stylesheet" href="../css/app.css" />
     </head>
     <body>
-        <?php require __DIR__ . '/../includes/header.php'; ?>
+        <?php $base_url = '../'; require '../includes/header.php'; ?>
 
         <main class="section">
             <div class="container">
@@ -94,10 +94,10 @@ try {
                 <div class="panel" style="padding: 20px">
                     <h2 style="margin-top: 0">管理工具</h2>
                     <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px">
-                        <a class="btn btn-primary" href="/group_41/admin/sql_view.php">SQL 資料檢視</a>
-                        <a class="btn btn-ghost" href="/group_41/admin/install.php?confirm=1">重新匯入資料庫</a>
-                        <a class="btn btn-ghost" href="/group_41/forms/list.php">管理表單</a>
-                        <a class="btn btn-ghost" href="/group_41/clubs/manage.php">管理社團</a>
+                        <a class="btn btn-primary" href="./sql_view.php">SQL 資料檢視</a>
+                        <a class="btn btn-ghost" href="./install.php?confirm=1">重新匯入資料庫</a>
+                        <a class="btn btn-ghost" href="../forms/list.php">管理表單</a>
+                        <a class="btn btn-ghost" href="../clubs/manage.php">管理社團</a>
                     </div>
                     <p class="muted" style="margin-top: 12px">重新匯入資料庫將執行 database.sql，請確認後再使用。</p>
                 </div>
@@ -105,7 +105,7 @@ try {
         </main>
 
         <footer class="footer container">社團表單系統</footer>
-        <script src="/group_41/js/app.js"></script>
+        <script src="../js/app.js"></script>
     </body>
 </html>
 

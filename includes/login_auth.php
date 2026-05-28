@@ -1,5 +1,5 @@
 <?php
-// Login database helper using the legacy PDO connection.
+// Login database helper (moved from archive/php_legacy/includes/login_auth.php)
 function login_authenticate($username, $password)
 {
     global $pdo;
@@ -41,3 +41,4 @@ function login_authenticate($username, $password)
 
     return $ok ? $user : null;
 }
+

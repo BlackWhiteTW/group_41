@@ -2,7 +2,7 @@
 // 社團系統首頁：展示公開表單、統計資訊和導航連結
 session_start();
 
-require __DIR__ . '/includes/db.php';
+require './includes/db.php';
 
 $user = !empty($_SESSION['user']) ? htmlspecialchars($_SESSION['user']) : null;
 $stats = [
@@ -47,11 +47,11 @@ try {
 			href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700&display=swap"
 			rel="stylesheet"
 		/>
-		<link rel="stylesheet" href="/group_41/css/app.css" />
+		<link rel="stylesheet" href="./css/app.css" />
 	</head>
 	<body>
 		<?php $show_status = true; ?>
-		<?php require __DIR__ . '/includes/header.php'; ?>
+		<?php $base_url = './'; require './includes/header.php'; ?>
 
 		<main>
 			<?php if ($flash_error) : ?>
@@ -79,9 +79,9 @@ try {
 								margin-top: 14px;
 							"
 						>
-							<a class="btn btn-primary" href="/group_41/forms/list.php">查看表單列表</a>
-							<a class="btn btn-ghost" href="/group_41/forms/create.php">建立新表單</a>
-							<a class="btn btn-ghost" href="/group_41/clubs/manage.php">查看社團資訊</a>
+							<a class="btn btn-primary" href="./forms/list.php">查看表單列表</a>
+							<a class="btn btn-ghost" href="./forms/create.php">建立新表單</a>
+							<a class="btn btn-ghost" href="./clubs/manage.php">查看社團資訊</a>
 						</div>
 					</article>
 
@@ -111,7 +111,7 @@ try {
 					<?php elseif (empty($public_forms)) : ?>
 						<div class="panel" style="padding: 20px">
 							<p class="muted">目前尚無公開表單。</p>
-							<a class="btn btn-primary" href="/group_41/forms/create.php">建立新表單</a>
+							<a class="btn btn-primary" href="./forms/create.php">建立新表單</a>
 						</div>
 					<?php else : ?>
 						<div id="public-form-list" class="card-grid">
@@ -135,9 +135,9 @@ try {
 											flex-wrap: wrap;
 										"
 									>
-										<a class="btn btn-primary" href="/group_41/forms/view.php?id=<?php echo (int) $form['id']; ?>">查看表單</a>
+										<a class="btn btn-primary" href="./forms/view.php?id=<?php echo (int) $form['id']; ?>">查看表單</a>
 										<?php if ($form['status'] === 'published') : ?>
-											<a class="btn btn-ghost" href="/group_41/forms/submit.php?id=<?php echo (int) $form['id']; ?>">前往填寫</a>
+											<a class="btn btn-ghost" href="./forms/submit.php?id=<?php echo (int) $form['id']; ?>">前往填寫</a>
 										<?php else : ?>
 											<span class="muted">尚未發布</span>
 										<?php endif; ?>
@@ -151,7 +151,7 @@ try {
 		</main>
 
 		<footer class="footer container">社團表單系統</footer>
-		<script src="/group_41/js/app.js"></script>
+		<script src="./js/app.js"></script>
 	</body>
 </html>
 

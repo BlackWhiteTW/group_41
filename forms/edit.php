@@ -1,6 +1,6 @@
 <?php
 session_start();
-require __DIR__ . '/../includes/db.php';
+require '../includes/db.php';
 
 $current_user_raw = isset($_SESSION['user']) ? $_SESSION['user'] : null;
 $current_user = null;
@@ -292,7 +292,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $form && $can_edit) {
 			}
 
 			$pdo->commit();
-			header('Location: /group_41/forms/view.php?id=' . $form_id);
+			header('Location: ./view.php?id=' . $form_id);
 			exit();
 		} catch (Throwable $e) {
 			if ($pdo && $pdo->inTransaction()) {
@@ -356,10 +356,10 @@ if ($form && $use_post_questions && empty($question_defaults)) {
 			href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700&display=swap"
 			rel="stylesheet"
 		/>
-		<link rel="stylesheet" href="/group_41/css/app.css" />
+		<link rel="stylesheet" href="../css/app.css" />
 	</head>
 	<body>
-		<?php require __DIR__ . '/../includes/header.php'; ?>
+		<?php $base_url = '../'; require '../includes/header.php'; ?>
 
 		<main class="section">
 			<div class="container">
@@ -376,7 +376,7 @@ if ($form && $use_post_questions && empty($question_defaults)) {
 					<?php if (!$question_editable) : ?>
 						<p class="muted">此表單已有填答，題目內容不可修改。</p>
 					<?php endif; ?>
-					<form class="panel" style="padding: 20px" method="post" action="/group_41/forms/edit.php">
+					<form class="panel" style="padding: 20px" method="post" action="./edit.php">
 						<input type="hidden" name="form_id" value="<?php echo $form_id; ?>" />
 						<div class="field">
 							<label for="title">表單標題</label>
@@ -533,8 +533,8 @@ if ($form && $use_post_questions && empty($question_defaults)) {
 
 						<div style="margin-top: 20px">
 							<button class="btn btn-primary" type="submit">更新表單</button>
-							<a class="btn btn-ghost" href="/group_41/forms/statistics.php?id=<?php echo $form_id; ?>">填寫紀錄</a>
-							<a class="btn btn-ghost" href="/group_41/forms/view.php?id=<?php echo $form_id; ?>">返回表單</a>
+							<a class="btn btn-ghost" href="./statistics.php?id=<?php echo $form_id; ?>">填寫紀錄</a>
+							<a class="btn btn-ghost" href="./view.php?id=<?php echo $form_id; ?>">返回表單</a>
 						</div>
 					</form>
 				<?php endif; ?>
@@ -542,7 +542,7 @@ if ($form && $use_post_questions && empty($question_defaults)) {
 		</main>
 
 		<footer class="footer container">社團表單系統</footer>
-		<script src="/group_41/js/app.js"></script>
+		<script src="../js/app.js"></script>
 	</body>
 </html>
 

@@ -1,7 +1,7 @@
 <?php
 // SQL 資料檢視頁面（管理區）：提供管理員查看資料庫內各資料表內容的介面
 session_start();
-require __DIR__ . '/../includes/db.php';
+require '../includes/db.php';
 
 $user_raw = isset($_SESSION['user']) ? $_SESSION['user'] : null;
 $user = !empty($user_raw) ? htmlspecialchars($user_raw) : null;
@@ -9,7 +9,7 @@ $current_user = null;
 $errors = [];
 
 if (empty($user_raw)) {
-  header('Location: /group_41/login.php');
+  header('Location: ../login.php');
   exit();
 }
 
@@ -44,7 +44,7 @@ try {
 
   if (!$current_user || $current_user['role'] !== 'admin') {
     $_SESSION['flash_error'] = '需要管理員權限才能瀏覽資料表。';
-    header('Location: /group_41/index.php');
+    header('Location: ../index.php');
     exit();
   }
 
@@ -77,10 +77,10 @@ try {
       href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/group_41/css/app.css" />
+    <link rel="stylesheet" href="../css/app.css" />
   </head>
   <body>
-    <?php require __DIR__ . '/../includes/header.php'; ?>
+    <?php $base_url = '../'; require '../includes/header.php'; ?>
 
     <main class="section">
       <div class="container">
@@ -97,7 +97,7 @@ try {
           </div>
         <?php else : ?>
           <div class="panel" style="padding: 20px; margin-bottom: 16px">
-            <form method="get" action="/group_41/admin/sql_view.php" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center">
+            <form method="get" action="sql_view.php" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center">
               <label for="table">選擇資料表</label>
               <select id="table" name="table">
                 <?php foreach ($allowed_tables as $table) : ?>
@@ -110,8 +110,8 @@ try {
               <span class="muted">共 <?php echo number_format($total_rows); ?> 筆，顯示前 200 筆</span>
             </form>
             <div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap">
-              <?php foreach ($allowed_tables as $table) : ?>
-                <a class="btn btn-ghost btn-small" href="/group_41/admin/sql_view.php?table=<?php echo urlencode($table); ?>">
+                <?php foreach ($allowed_tables as $table) : ?>
+                <a class="btn btn-ghost btn-small" href="sql_view.php?table=<?php echo urlencode($table); ?>">
                   <?php echo htmlspecialchars($table); ?>
                 </a>
               <?php endforeach; ?>
@@ -159,7 +159,7 @@ try {
     </main>
 
     <footer class="footer container">社團表單系統</footer>
-    <script src="/group_41/js/app.js"></script>
+    <script src="../js/app.js"></script>
   </body>
 </html>
 

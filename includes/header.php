@@ -54,21 +54,25 @@ if (!isset($user)) {
 }
 
 $show_status = isset($show_status) ? (bool) $show_status : false;
+$base_url = isset($base_url) ? $base_url : './';
+if ($base_url !== '' && substr($base_url, -1) !== '/') {
+	$base_url .= '/';
+}
 ?>
 <header class="topbar">
 	<div class="container nav">
-		<a href="/group_41/index.php" class="brand">Club Form Studio</a>
+		<a href="<?php echo $base_url; ?>index.php" class="brand">Club Form Studio</a>
 		<nav class="menu">
-			<a class="link-btn" href="/group_41/index.php">首頁</a>
-			<a class="link-btn" href="/group_41/forms/list.php">表單列表</a>
-			<a class="link-btn" href="/group_41/forms/create.php">新增表單</a>
-			<a class="link-btn" href="/group_41/clubs/manage.php">社團資訊</a>
-			<a class="link-btn" href="/group_41/forms/my_forms.php">我的表單</a>
+			<a class="link-btn" href="<?php echo $base_url; ?>index.php">首頁</a>
+			<a class="link-btn" href="<?php echo $base_url; ?>forms/list.php">表單列表</a>
+			<a class="link-btn" href="<?php echo $base_url; ?>forms/create.php">新增表單</a>
+			<a class="link-btn" href="<?php echo $base_url; ?>clubs/manage.php">社團資訊</a>
+			<a class="link-btn" href="<?php echo $base_url; ?>forms/my_forms.php">我的表單</a>
 			<?php if ($user) : ?>
-				<a class="btn btn-primary" href="/group_41/logout.php">登出</a>
+				<a class="btn btn-primary" href="<?php echo $base_url; ?>logout.php">登出</a>
 			<?php else : ?>
-				<a class="link-btn" href="/group_41/login.php">登入</a>
-				<a class="btn btn-primary" href="/group_41/register.php">註冊</a>
+				<a class="link-btn" href="<?php echo $base_url; ?>login.php">登入</a>
+				<a class="btn btn-primary" href="<?php echo $base_url; ?>register.php">註冊</a>
 			<?php endif; ?>
 		</nav>
 		<?php if ($show_status) : ?>

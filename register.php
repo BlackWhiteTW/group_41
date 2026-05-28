@@ -1,6 +1,6 @@
 <?php
 session_start();
-require __DIR__ . '/includes/db.php';
+require './includes/db.php';
 
 $user = !empty($_SESSION['user']) ? htmlspecialchars($_SESSION['user']) : null;
 
@@ -99,7 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->commit();
             $_SESSION['user'] = $username;
             $success = true;
-            header('Location: /group_41/index.php');
+            header('Location: ./index.php');
             exit();
         } catch (PDOException $e) {
             $pdo->rollBack();
@@ -108,7 +108,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// 直接輸出註冊頁面（已整合資源）
 ?>
 <!doctype html>
 <html lang="zh-Hant">
@@ -122,14 +121,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700&display=swap"
             rel="stylesheet"
         />
-        <link rel="stylesheet" href="/group_41/css/app.css" />
+        <link rel="stylesheet" href="./css/app.css" />
     </head>
     <body>
-        <?php require __DIR__ . '/includes/header.php'; ?>
+        <?php $base_url = './'; require './includes/header.php'; ?>
 
         <main class="form-page">
             <section class="form-card">
-                <a href="/group_41/index.php" class="muted">← 回首頁</a>
+                <a href="./index.php" class="muted">← 回首頁</a>
                 <h2>建立帳號</h2>
                 <p class="muted">可選擇加入既有社團或建立新社團。</p>
 
@@ -143,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                 <?php endif; ?>
 
-                <form id="registerForm" method="post" action="/group_41/register.php">
+                <form id="registerForm" method="post" action="./register.php">
                     <div class="field">
                         <label for="reg_username">帳號</label>
                         <input id="reg_username" name="username" required minlength="3" placeholder="至少 3 個字" value="<?php echo isset($_POST['username'])?htmlspecialchars($_POST['username']):''; ?>" />
@@ -196,7 +195,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </section>
         </main>
 
-        <script src="/group_41/js/app.js"></script>
+        <script src="./js/app.js"></script>
     </body>
 </html>
 

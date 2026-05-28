@@ -1,7 +1,7 @@
 <?php
 session_start();
 
-require __DIR__ . '/../includes/db.php';
+require '../includes/db.php';
 
 $user_raw = isset($_SESSION['user']) ? $_SESSION['user'] : null;
 $user = !empty($user_raw) ? htmlspecialchars($user_raw) : null;
@@ -22,7 +22,7 @@ $status_labels = [
 ];
 
 if (empty($user_raw)) {
-	header('Location: /group_41/login.php');
+	header('Location: ../login.php');
 	exit();
 }
 
@@ -71,10 +71,10 @@ try {
 			href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700&display=swap"
 			rel="stylesheet"
 		/>
-		<link rel="stylesheet" href="/group_41/css/app.css" />
+		<link rel="stylesheet" href="../css/app.css" />
 	</head>
 	<body>
-		<?php require __DIR__ . '/../includes/header.php'; ?>
+		<?php $base_url = '../'; require '../includes/header.php'; ?>
 
 		<main class="section">
 			<div class="container">
@@ -91,7 +91,7 @@ try {
 				<?php elseif (empty($forms)) : ?>
 					<div class="panel" style="padding: 20px">
 						<p class="muted">目前尚無表單。</p>
-						<a class="btn btn-primary" href="/group_41/forms/create.php">建立新表單</a>
+						<a class="btn btn-primary" href="./create.php">建立新表單</a>
 					</div>
 				<?php else : ?>
 					<div class="card-grid">
@@ -117,10 +117,10 @@ try {
 									狀態：<?php echo htmlspecialchars($status_label); ?> ・ 建立日：<?php echo htmlspecialchars($created_at); ?>
 								</p>
 								<div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap">
-									<a class="btn btn-primary" href="/group_41/forms/view.php?id=<?php echo (int) $form['id']; ?>">查看表單</a>
+									<a class="btn btn-primary" href="./view.php?id=<?php echo (int) $form['id']; ?>">查看表單</a>
 									<?php if ($can_edit) : ?>
-										<a class="btn btn-ghost" href="/group_41/forms/edit.php?id=<?php echo (int) $form['id']; ?>">修改表單</a>
-										<a class="btn btn-ghost" href="/group_41/forms/statistics.php?id=<?php echo (int) $form['id']; ?>">填寫紀錄</a>
+										<a class="btn btn-ghost" href="./edit.php?id=<?php echo (int) $form['id']; ?>">修改表單</a>
+										<a class="btn btn-ghost" href="./statistics.php?id=<?php echo (int) $form['id']; ?>">填寫紀錄</a>
 									<?php endif; ?>
 								</div>
 							</article>
@@ -131,7 +131,7 @@ try {
 		</main>
 
 		<footer class="footer container">社團表單系統</footer>
-		<script src="/group_41/js/app.js"></script>
+		<script src="../js/app.js"></script>
 	</body>
 </html>
 

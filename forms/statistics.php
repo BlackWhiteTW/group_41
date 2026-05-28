@@ -1,6 +1,6 @@
 <?php
 session_start();
-require __DIR__ . '/../includes/db.php';
+require '../includes/db.php';
 
 $current_user_raw = isset($_SESSION['user']) ? $_SESSION['user'] : null;
 $current_user = null;
@@ -15,6 +15,7 @@ $submissions = [];
 $answers_map = [];
 $summary = [];
 $chart_data = [];
+$pdo = null;
 $view = isset($_GET['view']) ? $_GET['view'] : 'detail';
 if (!in_array($view, ['detail', 'summary'], true)) {
 	$view = 'detail';
@@ -182,10 +183,10 @@ if (empty($errors)) {
 			href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700&display=swap"
 			rel="stylesheet"
 		/>
-		<link rel="stylesheet" href="/group_41/css/app.css" />
+		<link rel="stylesheet" href="../css/app.css" />
 	</head>
 	<body>
-		<?php require __DIR__ . '/../includes/header.php'; ?>
+		<?php $base_url = '../'; require '../includes/header.php'; ?>
 
 		<main class="section">
 			<div class="container">
@@ -198,7 +199,7 @@ if (empty($errors)) {
 							<?php endforeach; ?>
 						</ul>
 					</div>
-					<a class="btn btn-ghost" href="/group_41/forms/list.php">返回列表</a>
+					<a class="btn btn-ghost" href="./list.php">返回列表</a>
 				<?php else : ?>
 					<?php
 						$type_label = isset($type_labels[$form['form_type']]) ? $type_labels[$form['form_type']] : $form['form_type'];
@@ -214,14 +215,14 @@ if (empty($errors)) {
 						</p>
 						<div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap">
 							<?php if ($view === 'detail') : ?>
-								<a class="btn btn-primary" href="/group_41/forms/statistics.php?id=<?php echo $form_id; ?>&view=detail">詳細紀錄</a>
-								<a class="btn btn-ghost" href="/group_41/forms/statistics.php?id=<?php echo $form_id; ?>&view=summary">統整圖表</a>
+								<a class="btn btn-primary" href="./statistics.php?id=<?php echo $form_id; ?>&view=detail">詳細紀錄</a>
+								<a class="btn btn-ghost" href="./statistics.php?id=<?php echo $form_id; ?>&view=summary">統整圖表</a>
 							<?php else : ?>
-								<a class="btn btn-ghost" href="/group_41/forms/statistics.php?id=<?php echo $form_id; ?>&view=detail">詳細紀錄</a>
-								<a class="btn btn-primary" href="/group_41/forms/statistics.php?id=<?php echo $form_id; ?>&view=summary">統整圖表</a>
+								<a class="btn btn-ghost" href="./statistics.php?id=<?php echo $form_id; ?>&view=detail">詳細紀錄</a>
+								<a class="btn btn-primary" href="./statistics.php?id=<?php echo $form_id; ?>&view=summary">統整圖表</a>
 							<?php endif; ?>
-							<a class="btn btn-ghost" href="/group_41/forms/view.php?id=<?php echo $form_id; ?>">返回表單</a>
-							<a class="btn btn-ghost" href="/group_41/forms/edit.php?id=<?php echo $form_id; ?>">修改表單</a>
+							<a class="btn btn-ghost" href="./view.php?id=<?php echo $form_id; ?>">返回表單</a>
+							<a class="btn btn-ghost" href="./edit.php?id=<?php echo $form_id; ?>">修改表單</a>
 						</div>
 					</div>
 
@@ -301,9 +302,9 @@ if (empty($errors)) {
 		</main>
 
 		<footer class="footer container">社團表單系統</footer>
-		<script src="/group_41/js/app.js"></script>
+		<script src="../js/app.js"></script>
 		<?php if ($view === 'summary' && !empty($chart_data)) : ?>
-			<script src="/group_41/js/chart.umd.js"></script>
+			<script src="../js/chart.umd.js"></script>
 			<script>
 				(function(){
 					var charts = <?php echo json_encode($chart_data, JSON_UNESCAPED_UNICODE); ?>;
