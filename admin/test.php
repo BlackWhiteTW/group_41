@@ -8,7 +8,6 @@ if (empty($user_raw)) {
     exit();
 }
 
-$pdo = null;
 try {
     $pdo = get_db();
 } catch (Throwable $e) {
@@ -46,7 +45,14 @@ if (!$is_admin) {
 
 header('Content-Type: text/plain; charset=utf-8');
 
+// This is a plain-text debug endpoint, so we do not load the HTML sidebar here.
+
 $base = '../';
+
+echo "=== 管理員簡易測試報告 ===\n";
+echo "\n";
+echo "這是一個簡易的測試腳本但製作完後發現浪費時間且效益過低，實際上並沒有什麼有用的測試內容。\n";
+echo "\n";
 
 echo "DEBUG REPORT - admin/debug_assets.php\n";
 echo "Generated: " . date('Y-m-d H:i:s') . "\n\n";
@@ -61,7 +67,7 @@ $checks = [
     'css' => $base . 'css/app.css',
     'js' => $base . 'js/app.js',
     'db' => $base . 'includes/db.php',
-    'database_sql' => $base . 'database.sql'
+    'database_sql' => $base . 'group_41.sql'
 ];
 
 echo "1) 檔案存在性與路徑檢查\n";
@@ -102,12 +108,12 @@ if (file_exists($index_path)) {
 }
 
 // 3) group_41.sql 檔案內容檢查
-echo "3) database.sql 檔案內容檢查\n";
-$sql_path = $base . 'database.sql';
+echo "3) group_41.sql 檔案內容檢查\n";
+$sql_path = $base . 'group_41.sql';
 if (file_exists($sql_path)) {
     $sql = file_get_contents($sql_path);
     $len = strlen($sql);
-    echo "- database.sql 長度: {$len} bytes\n";
+    echo "- group_41.sql 長度: {$len} bytes\n";
     if (preg_match('/CREATE\s+DATABASE\s+IF\s+NOT\s+EXISTS\s+`?([a-zA-Z0-9_]+)`?/i', $sql, $m) || preg_match('/CREATE\s+DATABASE\s+`?([a-zA-Z0-9_]+)`?/i', $sql, $m)) {
         echo "- Found CREATE DATABASE -> " . $m[1] . "\n";
     } elseif (preg_match('/USE\s+`?([a-zA-Z0-9_]+)`?/i', $sql, $m2)) {
@@ -115,9 +121,9 @@ if (file_exists($sql_path)) {
     } else {
         echo "- 未在 SQL 檔找到 CREATE DATABASE 或 USE 宣告，請確認資料庫名稱是否在檔案中。\n";
     }
-    echo "- database.sql 存在";
+    echo "- group_41.sql 存在";
 } else {
-    echo "- database.sql 不存在。\n";
+    echo "- group_41.sql 不存在。\n";
 }
 
 // 4) includes/db.php 與實際 DB 連線檢查

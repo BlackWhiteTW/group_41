@@ -1,5 +1,5 @@
 <?php
-// 安裝腳本（管理區）：執行 database.sql 以建立資料表（僅限管理員使用）
+// 安裝腳本（管理區）：執行 group_41.sql 以建立資料表（僅限管理員使用）
 session_start();
 
 require '../includes/db.php';
@@ -23,7 +23,7 @@ if (!$current_user || $current_user['role'] !== 'admin') {
 }
 
 if (!isset($_GET['confirm']) || $_GET['confirm'] !== '1') {
-    $message = '要匯入資料庫請加上 ?confirm=1 參數。此腳本會執行 database.sql。';
+    $message = '要匯入資料庫請加上 ?confirm=1 參數。此腳本會執行 group_41.sql。';
     $status = 'info';
     $ready = false;
     $show_page = true;
@@ -34,14 +34,14 @@ $status = isset($status) ? $status : 'info';
 $ready = isset($ready) ? $ready : true;
 
 if ($ready) {
-    $sql_file = '../database.sql';
+    $sql_file = '../group_41.sql';
     if (!file_exists($sql_file)) {
-        $message = '找不到 database.sql';
+        $message = '找不到 group_41.sql';
         $status = 'error';
     } else {
         $sql = file_get_contents($sql_file);
         if ($sql === false) {
-            $message = '無法讀取 database.sql';
+            $message = '無法讀取 group_41.sql';
             $status = 'error';
         } else {
             $stmts = preg_split('/;\s*\n/', $sql);
@@ -55,7 +55,7 @@ if ($ready) {
                     $pdo->exec($stmt);
                 }
                 $pdo->commit();
-                $message = '已嘗試匯入 database.sql（請檢查錯誤訊息以確認結果）。';
+                $message = '已嘗試匯入 group_41.sql（請檢查錯誤訊息以確認結果）。';
                 $status = 'success';
             } catch (PDOException $e) {
                 $pdo->rollBack();
@@ -83,10 +83,12 @@ if ($ready) {
     <body>
         <?php $base_url = '../'; require '../includes/header.php'; ?>
 
+        <?php require __DIR__ . '/../includes/right.php'; ?>
+
         <main class="section">
             <div class="container">
                 <h1>安裝資料庫（管理區）</h1>
-                <p class="muted">執行 database.sql 以建立/重建資料表。</p>
+                <p class="muted">執行 group_41.sql 以建立/重建資料表。</p>
                 <?php if ($status === 'error') : ?>
                     <div class="error"><?php echo $message; ?></div>
                 <?php else : ?>

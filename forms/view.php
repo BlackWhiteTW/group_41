@@ -53,7 +53,7 @@ if ($form_id > 0) {
 				$managed_clubs = array_values(array_unique($managed_clubs));
 			}
 		}
-		$stmt = $pdo->prepare('SELECT f.*, u.username, c.name AS club_name FROM forms f JOIN users u ON u.id = f.creator_id JOIN clubs c ON c.id = f.club_id WHERE f.id = :id LIMIT 1');
+		$stmt = $pdo->prepare('SELECT f.*, u.username, c.name AS club_name FROM forms f JOIN users u ON u.id = f.creator_id LEFT JOIN clubs c ON c.id = f.club_id WHERE f.id = :id LIMIT 1');
 		$stmt->execute([':id' => $form_id]);
 		$form = $stmt->fetch();
 
@@ -109,6 +109,29 @@ if ($form) {
 			$access_message = '此表單僅限 ' . ($target_names ? implode('、', $target_names) : '指定社團') . ' 成員填寫。';
 		}
 	}
+	if ($can_submit && !empty($form['require_login']) && !$current_user) {
+		$can_submit = false;
+		$access_message = '此表單需登入才能填寫，請先登入。';
+	}
+	if ($can_submit) {
+		$now = date('Y-m-d H:i:s');
+		if (!empty($form['open_at']) && $now < $form['open_at']) {
+			$can_submit = false;
+			$access_message = '此表單尚未開放，預計開放時間：' . date('Y-m-d H:i', strtotime($form['open_at'])) . '。';
+		}
+		if (!empty($form['close_at']) && $now > $form['close_at']) {
+			$can_submit = false;
+			$access_message = '此表單已過期，關閉時間：' . date('Y-m-d H:i', strtotime($form['close_at'])) . '。';
+		}
+		if ($can_submit && $current_user && empty($form['allow_resubmit'])) {
+			$dup = $pdo->prepare('SELECT COUNT(*) FROM form_submissions WHERE form_id = :fid AND user_id = :uid');
+			$dup->execute([':fid' => $form_id, ':uid' => $current_user['id']]);
+			if ((int) $dup->fetchColumn() > 0) {
+				$can_submit = false;
+				$access_message = '此表單不允許重複填答，你已經填寫過了。';
+			}
+		}
+	}
 }
 ?>
 <!doctype html>
@@ -127,6 +150,8 @@ if ($form) {
 	</head>
 	<body>
 		<?php $base_url = '../'; require '../includes/header.php'; ?>
+
+		<?php require __DIR__ . '/../includes/right.php'; ?>
 
 		<main class="section">
 			<div class="container">
@@ -147,7 +172,7 @@ if ($form) {
 						if ($current_user) {
 							if ($is_admin) {
 								$can_edit = true;
-							} elseif (in_array((int) $form['club_id'], $managed_clubs, true)) {
+							} elseif ($form['club_id'] && in_array((int) $form['club_id'], $managed_clubs, true)) {
 								$can_edit = true;
 							}
 						}
@@ -170,6 +195,13 @@ if ($form) {
 							?>
 							<p class="meta">限定社團：<?php echo htmlspecialchars($target_names ? implode('、', $target_names) : '未指定'); ?></p>
 						<?php endif; ?>
+						<?php if (!empty($form['open_at']) || !empty($form['close_at'])) : ?>
+							<p class="meta" style="margin-top:4px">
+								<?php if (!empty($form['open_at'])) : ?>開放：<?php echo date('Y-m-d H:i', strtotime($form['open_at'])); ?><?php endif; ?>
+								<?php if (!empty($form['close_at'])) : ?><?php echo !empty($form['open_at']) ? ' ～ ' : ''; ?>關閉：<?php echo date('Y-m-d H:i', strtotime($form['close_at'])); ?><?php endif; ?>
+							</p>
+						<?php endif; ?>
+						<p class="meta" style="margin-top:4px">重複填答：<?php echo empty($form['allow_resubmit']) ? '禁止（每人僅限一次）' : '允許'; ?> ・ 登入要求：<?php echo empty($form['require_login']) ? '免登入' : '需登入'; ?></p>
 						<div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap">
 							<?php if ($can_submit) : ?>
 								<a class="btn btn-primary" href="./submit.php?id=<?php echo $form_id; ?>">前往填寫</a>

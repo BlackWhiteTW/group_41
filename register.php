@@ -1,5 +1,6 @@
 <?php
-session_start();
+require_once './includes/cookies.php';
+require_once './includes/csrf.php';
 require './includes/db.php';
 
 $user = !empty($_SESSION['user']) ? htmlspecialchars($_SESSION['user']) : null;
@@ -14,6 +15,9 @@ $existing_club = '';
 $new_club_name = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!csrf_verify($_POST['csrf_token'] ?? '')) {
+        $errors[] = '表單驗證失敗，請重新整理後再試。';
+    } else {
     $username = isset($_POST['username']) ? trim($_POST['username']) : '';
     $email = isset($_POST['email']) ? trim($_POST['email']) : '';
     $password = isset($_POST['password']) ? $_POST['password'] : '';
@@ -97,7 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $pdo->commit();
-            $_SESSION['user'] = $username;
+            set_user_session($username);
             $success = true;
             header('Location: ./index.php');
             exit();
@@ -105,6 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->rollBack();
             $errors[] = '註冊失敗：' . $e->getMessage();
         }
+    }
     }
 }
 
@@ -143,9 +148,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <?php endif; ?>
 
                 <form id="registerForm" method="post" action="./register.php">
+                    <?php echo csrf_field(); ?>
                     <div class="field">
                         <label for="reg_username">帳號</label>
                         <input id="reg_username" name="username" required minlength="3" placeholder="至少 3 個字" value="<?php echo isset($_POST['username'])?htmlspecialchars($_POST['username']):''; ?>" />
+                        <p class="field-hint" id="username-status" style="margin-top:4px;font-size:0.85rem;display:none;"></p>
                     </div>
 
                     <div class="field">

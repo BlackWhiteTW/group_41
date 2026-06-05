@@ -1,0 +1,275 @@
+/* ── Variables ── */
+:root {
+  --bg: #f2f7f4;
+  --bg-soft: #e9f1ed;
+  --card: #ffffff;
+  --text: #132017;
+  --muted: #6b7a72;
+  --brand: #0b7a5a;
+  --brand-strong: #085944;
+  --accent: #f5b357;
+  --border: #e0e9e3;
+  --shadow: 0 18px 35px rgba(10, 24, 18, 0.08);
+  --radius: 18px;
+  --radius-sm: 12px;
+}
+
+/* ── Reset ── */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Noto Sans TC", "IBM Plex Sans Thai", "Segoe UI", sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(
+      circle at top right,
+      #e7f4ee 0%,
+      rgba(231, 244, 238, 0) 45%
+    ),
+    linear-gradient(180deg, var(--bg) 0%, #ffffff 65%);
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* ── Typography ── */
+.muted {
+  color: var(--muted);
+}
+
+.meta {
+  color: var(--muted);
+  font-size: 0.92rem;
+  margin-top: 8px;
+}
+
+/* ── Layout ── */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+
+.container {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+}
+
+.brand {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--brand);
+  font-size: 1.1rem;
+}
+
+.menu {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.link-btn {
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-weight: 600;
+  color: var(--text);
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.link-btn:hover {
+  background: #eef5f2;
+  color: var(--brand-strong);
+}
+
+.hero {
+  padding: 64px 0 36px;
+}
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+  gap: 24px;
+  align-items: stretch;
+}
+
+.hero-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 28px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+.hero-card h1 {
+  font-size: clamp(3rem, 5vw, 4.5rem);
+  line-height: 1.2;
+  margin: 16px 0 8px;
+}
+
+.section {
+  padding: 8px 0 64px;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 18px;
+}
+
+.footer {
+  padding: 26px 0 40px;
+  text-align: center;
+  color: var(--muted);
+}
+
+/* ── Animations ── */
+.fade-up {
+  opacity: 0;
+  transform: translateY(14px);
+  animation: fadeUp 0.65s ease forwards;
+}
+
+@keyframes fadeUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Responsive ── */
+.hamburger {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  margin-left: auto;
+  flex-direction: column;
+  gap: 5px;
+  align-items: center;
+  justify-content: center;
+}
+
+.hamburger span {
+  display: block;
+  width: 24px;
+  height: 3px;
+  background: #132017;
+  border-radius: 3px;
+  transition:
+    transform 0.25s ease,
+    opacity 0.25s ease;
+}
+
+.hamburger.open span:nth-child(1) {
+  transform: translateY(8px) rotate(45deg);
+}
+
+.hamburger.open span:nth-child(2) {
+  opacity: 0;
+}
+
+.hamburger.open span:nth-child(3) {
+  transform: translateY(-8px) rotate(-45deg);
+}
+
+@media (max-width: 900px) {
+  .hamburger {
+    display: flex !important;
+  }
+
+  .nav {
+    flex-wrap: wrap;
+  }
+
+  .menu {
+    display: none !important;
+    width: 100%;
+    flex-direction: column;
+    padding: 12px 0 4px;
+    gap: 2px;
+    border-top: 1px solid var(--border);
+    margin-top: 8px;
+  }
+
+  .menu.open {
+    display: flex !important;
+  }
+
+  .menu .link-btn {
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-size: 0.95rem;
+  }
+
+  .menu .link-btn:hover {
+    background: #eef7f2;
+  }
+
+  .menu .btn {
+    margin-top: 8px;
+    padding: 12px 16px;
+    font-size: 0.95rem;
+  }
+
+  .hero-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .container {
+    padding: 0 12px;
+  }
+
+  .brand {
+    font-size: 1rem;
+  }
+
+  .hero {
+    padding: 24px 0 20px;
+  }
+
+  .hero-card {
+    padding: 18px;
+  }
+
+  .hero-card h1 {
+    font-size: 1.5rem;
+  }
+
+  .section {
+    padding: 4px 0 32px;
+  }
+
+  .footer {
+    padding: 16px 0 24px;
+  }
+
+  .link-btn,
+  .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

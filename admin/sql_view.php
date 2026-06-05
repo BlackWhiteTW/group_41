@@ -1,5 +1,6 @@
 <?php
 // SQL 資料檢視頁面（管理區）：提供管理員查看資料庫內各資料表內容的介面
+
 session_start();
 require '../includes/db.php';
 
@@ -24,15 +25,28 @@ $allowed_tables = [
   'answers'
 ];
 
+$table_descriptions = [
+  'users'              => '使用者帳號表 — 儲存所有使用者基本資料、系統層級角色，以及記住我 Token 雜湊（remember_token_hash）。',
+  'clubs'              => '社團基本資料表 — 每個社團由一位使用者建立，記錄名稱、簡介、加入模式與可見性。',
+  'club_memberships'   => '社團成員關聯表 — 使用者 ↔ 社團的多對多關係，記錄每位成員在社團中的角色。',
+  'forms'              => '表單主表 — 每張表單的標題、權限、狀態與開放時間，可掛在社團下或設為全域表單。',
+  'form_questions'     => '表單題目表 — 一張表單可包含多個題目，支援簡答、長答、單選、多選、檔案上傳。',
+  'question_options'   => '選擇題選項表 — 僅用於單選 / 多選題，每個選項屬於一道題目。',
+  'form_submissions'   => '表單填寫記錄表 — 每次提交產生一筆，記錄填答者與提交時間。',
+  'answers'            => '答案明細表 — 一筆提交中每題的具體答案，文字/選項/檔案路徑擇一存放。',
+];
+
 $selected = isset($_GET['table']) ? $_GET['table'] : $allowed_tables[0];
 if (!in_array($selected, $allowed_tables, true)) {
   $selected = $allowed_tables[0];
 }
 
-$counts = [];
-$columns = [];
-$rows = [];
-$total_rows = 0;
+$counts      = [];
+$columns     = [];   // ['Field' => ..., 'Type' => ..., 'Comment' => ...]
+$column_names = [];
+$rows        = [];
+$total_rows  = 0;
+$table_comment = '';
 
 try {
   $pdo = get_db();
@@ -52,13 +66,19 @@ try {
     $counts[$table] = (int) $pdo->query('SELECT COUNT(*) FROM `' . $table . '`')->fetchColumn();
   }
 
-  $desc = $pdo->query('DESCRIBE `' . $selected . '`')->fetchAll();
-  foreach ($desc as $col) {
-    $columns[] = $col['Field'];
+  // 取得完整欄位資訊（含 Comment）
+  $col_info = $pdo->query('SHOW FULL COLUMNS FROM `' . $selected . '`')->fetchAll();
+  foreach ($col_info as $col) {
+    $columns[] = $col;
+    $column_names[] = $col['Field'];
   }
 
+  // 取得資料表註解
+  $tbl_status = $pdo->query("SHOW TABLE STATUS WHERE Name = '$selected'")->fetch();
+  $table_comment = $tbl_status['Comment'] ?? '';
+
   $total_rows = isset($counts[$selected]) ? $counts[$selected] : 0;
-  $order_sql = in_array('id', $columns, true) ? ' ORDER BY `id` DESC' : '';
+  $order_sql = in_array('id', $column_names, true) ? ' ORDER BY `id` DESC' : '';
   $stmt = $pdo->query('SELECT * FROM `' . $selected . '`' . $order_sql . ' LIMIT 200');
   $rows = $stmt->fetchAll();
 } catch (Throwable $e) {
@@ -82,6 +102,8 @@ try {
   <body>
     <?php $base_url = '../'; require '../includes/header.php'; ?>
 
+    <?php require __DIR__ . '/../includes/right.php'; ?>
+
     <main class="section">
       <div class="container">
         <h1>SQL 資料檢視 (管理區)</h1>
@@ -97,55 +119,62 @@ try {
           </div>
         <?php else : ?>
           <div class="panel" style="padding: 20px; margin-bottom: 16px">
-            <form method="get" action="sql_view.php" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center">
-              <label for="table">選擇資料表</label>
-              <select id="table" name="table">
-                <?php foreach ($allowed_tables as $table) : ?>
-                  <option value="<?php echo htmlspecialchars($table); ?>" <?php echo $table === $selected ? 'selected' : ''; ?>>
-                    <?php echo htmlspecialchars($table); ?> (<?php echo number_format($counts[$table] ?? 0); ?>)
-                  </option>
-                <?php endforeach; ?>
-              </select>
-              <button class="btn btn-primary" type="submit">切換</button>
-              <span class="muted">共 <?php echo number_format($total_rows); ?> 筆，顯示前 200 筆</span>
-            </form>
-            <div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap">
-                <?php foreach ($allowed_tables as $table) : ?>
-                <a class="btn btn-ghost btn-small" href="sql_view.php?table=<?php echo urlencode($table); ?>">
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center">
+              <?php foreach ($allowed_tables as $table) : ?>
+                <a class="btn <?php echo $table === $selected ? 'btn-primary' : 'btn-ghost'; ?>"
+                   href="sql_view.php?table=<?php echo urlencode($table); ?>">
                   <?php echo htmlspecialchars($table); ?>
+                  <span class="badge" style="margin-left: 4px; background: <?php echo $table === $selected ? 'rgba(255,255,255,0.25)' : '#e4efe8'; ?>; color: <?php echo $table === $selected ? '#fff' : '#2a7d4f'; ?>; font-size: 11px">
+                    <?php echo number_format($counts[$table] ?? 0); ?>
+                  </span>
                 </a>
               <?php endforeach; ?>
             </div>
+            <?php $desc_text = $table_comment ?: ($table_descriptions[$selected] ?? ''); ?>
+            <?php if ($desc_text) : ?>
+              <p style="margin-top: 12px; padding: 8px 14px; background: #f5faf7; border-left: 4px solid #2a7d4f; border-radius: 4px; font-size: 13px; color: #2a4d36">
+                <?php echo htmlspecialchars($desc_text); ?>
+              </p>
+            <?php endif; ?>
+            <div style="margin-top: 8px; font-size: 12px; color: #888">
+              共 <?php echo number_format($total_rows); ?> 筆資料，顯示前 200 筆
+            </div>
           </div>
 
-          <div class="panel" style="padding: 20px; overflow: auto">
+          <div class="panel" style="padding: 0; overflow: auto">
             <?php if (empty($columns)) : ?>
-              <p class="muted">找不到資料欄位。</p>
+              <p class="muted" style="padding: 20px">找不到資料欄位。</p>
             <?php elseif (empty($rows)) : ?>
-              <p class="muted">目前沒有資料。</p>
+              <p class="muted" style="padding: 20px">目前沒有資料。</p>
             <?php else : ?>
-              <table style="width: 100%; border-collapse: collapse">
+              <table class="data-table" style="width: 100%; border-collapse: collapse; font-size: 13px">
                 <thead>
                   <tr>
                     <?php foreach ($columns as $col) : ?>
-                      <th style="text-align: left; padding: 8px; border-bottom: 1px solid #e4efe8; white-space: nowrap">
-                        <?php echo htmlspecialchars($col); ?>
+                      <th style="text-align: left; padding: 10px 12px; border-bottom: 2px solid #2a7d4f; background: #f5faf7; white-space: nowrap; position: sticky; top: 0">
+                        <div style="font-weight: 700"><?php echo htmlspecialchars($col['Field']); ?></div>
+                        <div style="font-weight: 400; font-size: 11px; color: #6b8f71"><?php echo htmlspecialchars($col['Type']); ?></div>
+                        <?php if (!empty($col['Comment'])) : ?>
+                          <div style="font-weight: 400; font-size: 11px; color: #999; max-width: 180px; white-space: normal"><?php echo htmlspecialchars($col['Comment']); ?></div>
+                        <?php endif; ?>
                       </th>
                     <?php endforeach; ?>
                   </tr>
                 </thead>
                 <tbody>
-                  <?php foreach ($rows as $row) : ?>
-                    <tr>
+                  <?php foreach ($rows as $idx => $row) : ?>
+                    <tr style="background: <?php echo $idx % 2 === 0 ? '#fff' : '#f9fbfa'; ?>">
                       <?php foreach ($columns as $col) : ?>
                         <?php
-                          $value = isset($row[$col]) ? $row[$col] : '';
-                          if (is_null($value)) {
-                            $value = '';
-                          }
+                          $field = $col['Field'];
+                          $value = $row[$field] ?? null;
                         ?>
-                        <td style="padding: 8px; border-bottom: 1px solid #f0f4f1; vertical-align: top; min-width: 120px">
-                          <?php echo nl2br(htmlspecialchars((string) $value)); ?>
+                        <td style="padding: 8px 12px; border-bottom: 1px solid #e4efe8; vertical-align: top; min-width: 100px; max-width: 360px; word-break: break-all">
+                          <?php if (is_null($value)) : ?>
+                            <span style="color: #c0c8c3; font-style: italic; font-size: 11px">NULL</span>
+                          <?php else : ?>
+                            <?php echo nl2br(htmlspecialchars((string) $value)); ?>
+                          <?php endif; ?>
                         </td>
                       <?php endforeach; ?>
                     </tr>

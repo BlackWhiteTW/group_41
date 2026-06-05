@@ -15,11 +15,11 @@ $submissions = [];
 $answers_map = [];
 $summary = [];
 $chart_data = [];
-$pdo = null;
 $view = isset($_GET['view']) ? $_GET['view'] : 'detail';
 if (!in_array($view, ['detail', 'summary'], true)) {
 	$view = 'detail';
 }
+$csv = isset($_GET['csv']);
 
 $type_labels = [
 	'public' => '公開表單',
@@ -63,7 +63,7 @@ try {
 }
 
 if (empty($errors)) {
-	$stmt = $pdo->prepare('SELECT f.*, u.username, c.name AS club_name FROM forms f JOIN users u ON u.id = f.creator_id JOIN clubs c ON c.id = f.club_id WHERE f.id = :id LIMIT 1');
+	$stmt = $pdo->prepare('SELECT f.*, u.username, c.name AS club_name FROM forms f JOIN users u ON u.id = f.creator_id LEFT JOIN clubs c ON c.id = f.club_id WHERE f.id = :id LIMIT 1');
 	$stmt->execute([':id' => $form_id]);
 	$form = $stmt->fetch();
 	if (!$form) {
@@ -75,7 +75,9 @@ $can_view = false;
 if ($current_user && $form) {
 	if ($is_admin) {
 		$can_view = true;
-	} elseif (in_array((int) $form['club_id'], $managed_clubs, true)) {
+	} elseif ((int) $form['creator_id'] === (int) $current_user['id']) {
+		$can_view = true;
+	} elseif ($form['club_id'] && in_array((int) $form['club_id'], $managed_clubs, true)) {
 		$can_view = true;
 	}
 }
@@ -100,19 +102,31 @@ if (empty($errors)) {
 		}
 	}
 
-	$s_stmt = $pdo->prepare('SELECT s.id, s.submitted_at, s.user_id, s.ip_address, u.username AS submitter FROM form_submissions s LEFT JOIN users u ON u.id = s.user_id WHERE s.form_id = :id ORDER BY s.submitted_at DESC');
+	$s_stmt = $pdo->prepare('SELECT s.id, s.submitted_at, s.user_id, u.username AS submitter FROM form_submissions s LEFT JOIN users u ON u.id = s.user_id WHERE s.form_id = :id ORDER BY s.submitted_at DESC');
 	$s_stmt->execute([':id' => $form_id]);
 	$submissions = $s_stmt->fetchAll();
 
 	if (!empty($submissions)) {
 		$submission_ids = array_column($submissions, 'id');
 		$placeholders = implode(',', array_fill(0, count($submission_ids), '?'));
-		$a_stmt = $pdo->prepare('SELECT a.submission_id, a.question_id, a.answer_text, a.option_id, o.option_text FROM answers a LEFT JOIN question_options o ON o.id = a.option_id WHERE a.submission_id IN (' . $placeholders . ') ORDER BY a.submission_id ASC, a.question_id ASC, o.option_order ASC');
+		$a_stmt = $pdo->prepare('SELECT a.id, a.submission_id, a.question_id, a.answer_text, a.option_id, a.file_path, o.option_text FROM answers a LEFT JOIN question_options o ON o.id = a.option_id WHERE a.submission_id IN (' . $placeholders . ') ORDER BY a.submission_id ASC, a.question_id ASC, o.option_order ASC');
 		$a_stmt->execute($submission_ids);
 		$answers = $a_stmt->fetchAll();
+		$file_map = [];
 		foreach ($answers as $row) {
 			$value = '';
-			if (!empty($row['option_id'])) {
+			if (!empty($row['file_path'])) {
+				$filename = $row['answer_text'] ?: '下載';
+				$ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+				$is_image = in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'], true);
+				$value = [
+					'type' => 'file',
+					'aid' => (int) $row['id'],
+					'filename' => $filename,
+					'ext' => $ext,
+					'is_image' => $is_image,
+				];
+			} elseif (!empty($row['option_id'])) {
 				$value = $row['option_text'];
 			} else {
 				$value = $row['answer_text'];
@@ -170,6 +184,42 @@ if (empty($errors)) {
 		}
 	}
 }
+
+if ($csv && empty($errors)) {
+	header('Content-Type: text/csv; charset=utf-8');
+	header('Content-Disposition: attachment; filename="form_' . $form_id . '_export.csv"');
+
+	$out = fopen('php://output', 'w');
+	fwrite($out, "\xEF\xBB\xBF");
+
+	$headers = ['編號', '填寫者', '填寫時間'];
+	foreach ($questions as $q) {
+		$headers[] = $q['question_text'];
+	}
+	fputcsv($out, $headers);
+
+	foreach ($submissions as $submission) {
+		$row = [
+			$submission['id'],
+			$submission['submitter'] ?: '訪客',
+			$submission['submitted_at']
+		];
+		foreach ($questions as $q) {
+			$answers = $answers_map[$submission['id']][$q['id']] ?? [];
+			if (empty($answers)) {
+				$row[] = '';
+			} elseif (is_array($answers[0]) && isset($answers[0]['type']) && $answers[0]['type'] === 'file') {
+				$row[] = '[檔案] ' . $answers[0]['filename'];
+			} else {
+				$row[] = implode(' / ', $answers);
+			}
+		}
+		fputcsv($out, $row);
+	}
+
+	fclose($out);
+	exit();
+}
 ?>
 <!doctype html>
 <html lang="zh-Hant">
@@ -187,6 +237,8 @@ if (empty($errors)) {
 	</head>
 	<body>
 		<?php $base_url = '../'; require '../includes/header.php'; ?>
+
+		<?php require __DIR__ . '/../includes/right.php'; ?>
 
 		<main class="section">
 			<div class="container">
@@ -221,6 +273,7 @@ if (empty($errors)) {
 								<a class="btn btn-ghost" href="./statistics.php?id=<?php echo $form_id; ?>&view=detail">詳細紀錄</a>
 								<a class="btn btn-primary" href="./statistics.php?id=<?php echo $form_id; ?>&view=summary">統整圖表</a>
 							<?php endif; ?>
+							<a class="btn btn-ghost" href="./statistics.php?id=<?php echo $form_id; ?>&csv=1">匯出 CSV</a>
 							<a class="btn btn-ghost" href="./view.php?id=<?php echo $form_id; ?>">返回表單</a>
 							<a class="btn btn-ghost" href="./edit.php?id=<?php echo $form_id; ?>">修改表單</a>
 						</div>
@@ -265,11 +318,10 @@ if (empty($errors)) {
 								<?php
 									$submitter = $submission['submitter'] ?: '訪客';
 									$submitted_at = !empty($submission['submitted_at']) ? date('Y-m-d H:i', strtotime($submission['submitted_at'])) : '';
-									$ip = $submission['ip_address'] ?: '-';
 								?>
 								<div class="panel" style="padding: 20px; margin-top: 16px">
 									<h3>填寫紀錄 #<?php echo htmlspecialchars($submission['id']); ?></h3>
-									<p class="meta">填寫者：<?php echo htmlspecialchars($submitter); ?> ・ IP：<?php echo htmlspecialchars($ip); ?> ・ 時間：<?php echo htmlspecialchars($submitted_at); ?></p>
+									<p class="meta">填寫者：<?php echo htmlspecialchars($submitter); ?> ・ 時間：<?php echo htmlspecialchars($submitted_at); ?></p>
 									<?php if (empty($questions)) : ?>
 										<p class="muted">此表單沒有題目。</p>
 									<?php else : ?>
@@ -277,9 +329,17 @@ if (empty($errors)) {
 											<?php
 												$answers = $answers_map[$submission['id']][$q['id']] ?? [];
 												$answer_text = '未填';
+												$file_info = null;
 												if (!empty($answers)) {
-													if (count($answers) === 1) {
-														$answer_text = nl2br(htmlspecialchars($answers[0]));
+													if (is_array($answers[0]) && isset($answers[0]['type']) && $answers[0]['type'] === 'file') {
+														$file_info = $answers[0];
+														$answer_text = htmlspecialchars($file_info['filename']);
+													} elseif (count($answers) === 1) {
+														if (strpos($answers[0], '<a ') === 0) {
+															$answer_text = $answers[0];
+														} else {
+															$answer_text = nl2br(htmlspecialchars($answers[0]));
+														}
 													} else {
 														$clean_answers = array_map('htmlspecialchars', $answers);
 														$answer_text = implode('、', $clean_answers);
@@ -289,7 +349,15 @@ if (empty($errors)) {
 											<div style="padding: 12px 0; border-bottom: 1px solid #e4efe8">
 												<strong>Q<?php echo htmlspecialchars($q['question_order']); ?>. <?php echo htmlspecialchars($q['question_text']); ?></strong>
 												<p class="muted">題型：<?php echo htmlspecialchars($q['question_type']); ?> ・ <?php echo $q['is_required'] ? '必填' : '選填'; ?></p>
-												<p><?php echo $answer_text; ?></p>
+												<?php if ($file_info) : ?>
+													<p style="margin-bottom:6px">📎 <?php echo $answer_text; ?>（<?php echo htmlspecialchars(strtoupper($file_info['ext'])); ?>）</p>
+													<div style="display:flex;gap:8px;flex-wrap:wrap">
+														<a class="btn btn-primary btn-small" href="download.php?aid=<?php echo $file_info['aid']; ?>&preview=1" target="_blank">🔍 預覽</a>
+														<a class="btn btn-ghost btn-small" href="download.php?aid=<?php echo $file_info['aid']; ?>">⬇ 下載</a>
+													</div>
+												<?php else : ?>
+													<p><?php echo $answer_text; ?></p>
+												<?php endif; ?>
 											</div>
 										<?php endforeach; ?>
 									<?php endif; ?>

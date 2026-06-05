@@ -12,12 +12,6 @@ $stats = [
 ];
 $public_forms = [];
 $public_error = null;
-$flash_error = null;
-
-if (!empty($_SESSION['flash_error'])) {
-	$flash_error = $_SESSION['flash_error'];
-	unset($_SESSION['flash_error']);
-}
 
 try {
 	$pdo = get_db();
@@ -53,14 +47,10 @@ try {
 		<?php $show_status = true; ?>
 		<?php $base_url = './'; require './includes/header.php'; ?>
 
-		<main>
-			<?php if ($flash_error) : ?>
-				<section class="section">
-					<div class="container">
-						<div class="error"><?php echo htmlspecialchars($flash_error); ?></div>
-					</div>
-				</section>
-			<?php endif; ?>
+		<main class="section">
+			<div class="container" style="display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); align-items: start">
+
+				<div>
 			<section class="hero">
 				<div class="container hero-grid">
 					<article class="hero-card fade-up">
@@ -68,21 +58,7 @@ try {
 						<h1>
 							校園活動問卷平台
 						</h1>
-						<p class="muted">
-							<span>登入狀態：<?php echo $user ? '已登入：' . $user : '未登入'; ?></span>
-						</p>
-						<div
-							style="
-								display: flex;
-								gap: 10px;
-								flex-wrap: wrap;
-								margin-top: 14px;
-							"
-						>
-							<a class="btn btn-primary" href="./forms/list.php">查看表單列表</a>
-							<a class="btn btn-ghost" href="./forms/create.php">建立新表單</a>
-							<a class="btn btn-ghost" href="./clubs/manage.php">查看社團資訊</a>
-						</div>
+							<h2 class="muted">每個社團的個人化表單管理系統</h2>
 					</article>
 
 					<aside class="panel stats fade-up" style="animation-delay: 120ms">
@@ -148,9 +124,10 @@ try {
 					<?php endif; ?>
 				</div>
 			</section>
+				</div>
+			</div>
 		</main>
 
-		<footer class="footer container">社團表單系統</footer>
 		<script src="./js/app.js"></script>
 	</body>
 </html>

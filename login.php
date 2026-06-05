@@ -1,7 +1,8 @@
 <?php
-session_start();
+require_once './includes/cookies.php';
+require_once './includes/csrf.php';
 
-$user = !empty($_SESSION['user']) ? htmlspecialchars($_SESSION['user']) : null;
+$user = $GLOBALS['user'] ?? null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	require './includes/db.php';
@@ -9,17 +10,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	$username = isset($_POST['username']) ? trim($_POST['username']) : '';
 	$password = isset($_POST['password']) ? $_POST['password'] : '';
 
-	if ($username === '' || $password === '') {
+	if (!csrf_verify($_POST['csrf_token'] ?? '')) {
+		$error = '表單驗證失敗，請重新整理後再試。';
+	} elseif ($username === '' || $password === '') {
 		$error = '請輸入帳號與密碼';
 	} else {
 		$auth_user = login_authenticate($username, $password);
 		if ($auth_user) {
-				session_regenerate_id(true);
-				$_SESSION['user'] = $auth_user['username'];
-				$_SESSION['last_activity'] = time();
-				$ttl = 3600; // 1 小時
-				setcookie('remember_active', '1', time() + $ttl, '/');
-				setcookie(session_name(), session_id(), time() + $ttl, '/', '', false, true);
+				set_user_session($auth_user['username']);
 			header('Location: ./index.php');
 			exit();
 		}
@@ -55,6 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 				<?php endif; ?>
 
 				<form id="loginForm" method="post" action="./login.php">
+					<?php echo csrf_field(); ?>
 					<div class="field">
 						<label for="username">帳號</label>
 						<input id="username" name="username" required placeholder="請輸入帳號" value="<?php echo isset($_POST['username'])?htmlspecialchars($_POST['username']):''; ?>" />
@@ -67,6 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 				</form>
 
 				<p class="muted" style="margin-top:12px">沒有帳號？<a href="./register.php">前往註冊</a></p>
+				<p class="muted"><a href="./forgot_password.php">忘記密碼？</a></p>
 			</section>
 		</main>
 

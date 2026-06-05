@@ -2,6 +2,7 @@
 session_start();
 
 require '../includes/db.php';
+require '../includes/csrf.php';
 
 $user_raw = isset($_SESSION['user']) ? $_SESSION['user'] : null;
 $user = !empty($user_raw) ? htmlspecialchars($user_raw) : null;
@@ -10,11 +11,13 @@ $is_admin = false;
 $member_clubs = [];
 $club_map = [];
 $form_id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+$preview = isset($_GET['preview']);
 $form = null;
 $questions = [];
 $options_map = [];
 $errors = [];
 $target_clubs = [];
+$is_owner = false;
 
 function parse_target_clubs($value)
 {
@@ -27,6 +30,9 @@ function parse_target_clubs($value)
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+	if (!csrf_verify($_POST['csrf_token'] ?? '')) {
+		$errors[] = '表單驗證失敗，請重新整理後再試。';
+	}
 	$form_id = isset($_POST['form_id']) ? (int) $_POST['form_id'] : 0;
 }
 
@@ -54,6 +60,9 @@ if ($form_id > 0) {
 		$form = $stmt->fetch();
 
 		if ($form) {
+			if ($current_user && ($is_admin || (int)$current_user['id'] === (int)$form['creator_id'])) {
+				$is_owner = true;
+			}
 			$q_stmt = $pdo->prepare('SELECT * FROM form_questions WHERE form_id = :id ORDER BY question_order ASC');
 			$q_stmt->execute([':id' => $form_id]);
 			$questions = $q_stmt->fetchAll();
@@ -74,6 +83,22 @@ if ($form_id > 0) {
 	}
 }
 
+if ($form && empty($errors) && !empty($form['require_login']) && !$current_user) {
+	$errors[] = '此表單需登入才能填寫，請先登入。';
+}
+
+if ($form && empty($errors) && empty($form['allow_resubmit']) && $current_user) {
+	try {
+		$dup = $pdo->prepare('SELECT COUNT(*) FROM form_submissions WHERE form_id = :fid AND user_id = :uid');
+		$dup->execute([':fid' => $form_id, ':uid' => $current_user['id']]);
+		if ((int) $dup->fetchColumn() > 0) {
+			$errors[] = '此表單不允許重複填答，你已經填寫過了。';
+		}
+	} catch (Throwable $e) {
+		$errors[] = '表單驗證失敗，請稍後再試。';
+	}
+}
+
 if ($form && empty($errors) && $form['form_type'] === 'club_only') {
 	$target_clubs = parse_target_clubs($form['target_club_ids']);
 	if (!$current_user) {
@@ -86,6 +111,16 @@ if ($form && empty($errors) && $form['form_type'] === 'club_only') {
 			}
 		}
 		$errors[] = '此表單僅限 ' . ($target_names ? implode('、', $target_names) : '指定社團') . ' 成員填寫。';
+	}
+}
+
+if ($form && empty($errors) && $form['status'] === 'published') {
+	$now = date('Y-m-d H:i:s');
+	if (!empty($form['open_at']) && $now < $form['open_at']) {
+		$errors[] = '此表單尚未開放填寫，預計開放時間：' . date('Y-m-d H:i', strtotime($form['open_at'])) . '。';
+	}
+	if (!empty($form['close_at']) && $now > $form['close_at']) {
+		$errors[] = '此表單已過期，關閉時間：' . date('Y-m-d H:i', strtotime($form['close_at'])) . '。';
 	}
 }
 
@@ -130,6 +165,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $form && empty($errors)) {
 						}
 					}
 				}
+			} elseif ($type === 'file_upload') {
+				$file = isset($_FILES['files']['name'][$qid]) ? $_FILES['files']['name'][$qid] : '';
+				if ($required && empty($file)) {
+					$errors[] = '題目「' . $q['question_text'] . '」為必填，請上傳檔案。';
+				} elseif (!empty($file)) {
+					$tmp = $_FILES['files']['tmp_name'][$qid];
+					$size = $_FILES['files']['size'][$qid];
+					$error = $_FILES['files']['error'][$qid];
+					if ($error !== UPLOAD_ERR_OK) {
+						$errors[] = '題目「' . $q['question_text'] . '」檔案上傳失敗。';
+					} elseif ($size > 5 * 1024 * 1024) {
+						$errors[] = '題目「' . $q['question_text'] . '」檔案不可超過 5 MB。';
+					}
+				}
 			}
 		}
 	}
@@ -145,15 +194,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $form && empty($errors)) {
 				$urow = $u->fetch();
 				$user_id = $urow ? (int) $urow['id'] : null;
 			}
-			$s = $pdo->prepare('INSERT INTO form_submissions (form_id, user_id, ip_address) VALUES (:f, :u, :ip)');
+			$s = $pdo->prepare('INSERT INTO form_submissions (form_id, user_id) VALUES (:f, :u)');
 			$s->execute([
 				':f' => $form_id,
-				':u' => $user_id,
-				':ip' => isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : null
+				':u' => $user_id
 			]);
 			$submission_id = (int) $pdo->lastInsertId();
 
-			$a = $pdo->prepare('INSERT INTO answers (submission_id, question_id, answer_text, option_id) VALUES (:s, :q, :t, :o)');
+			$a = $pdo->prepare('INSERT INTO answers (submission_id, question_id, answer_text, option_id, file_path) VALUES (:s, :q, :t, :o, :fp)');
 			foreach ($questions as $q) {
 				$qid = $q['id'];
 				$type = $q['question_type'];
@@ -166,7 +214,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $form && empty($errors)) {
 							':s' => $submission_id,
 							':q' => $qid,
 							':t' => $text,
-							':o' => null
+							':o' => null,
+							':fp' => null
 						]);
 					}
 				} elseif ($type === 'multiple_choice') {
@@ -176,7 +225,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $form && empty($errors)) {
 							':s' => $submission_id,
 							':q' => $qid,
 							':t' => null,
-							':o' => $option_id
+							':o' => $option_id,
+							':fp' => null
 						]);
 					}
 				} elseif ($type === 'multi_choice') {
@@ -188,7 +238,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $form && empty($errors)) {
 								':s' => $submission_id,
 								':q' => $qid,
 								':t' => null,
-								':o' => $oid
+								':o' => $oid,
+								':fp' => null
+							]);
+						}
+					}
+				} elseif ($type === 'file_upload') {
+					$file_name = isset($_FILES['files']['name'][$qid]) ? $_FILES['files']['name'][$qid] : '';
+					if (!empty($file_name) && $_FILES['files']['error'][$qid] === UPLOAD_ERR_OK) {
+						$ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
+						$stored_name = $submission_id . '_' . $qid . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+						$dest = __DIR__ . '/../uploads/' . $stored_name;
+						if (move_uploaded_file($_FILES['files']['tmp_name'][$qid], $dest)) {
+							$a->execute([
+								':s' => $submission_id,
+								':q' => $qid,
+								':t' => $file_name,
+								':o' => null,
+								':fp' => $stored_name
 							]);
 						}
 					}
@@ -224,6 +291,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $form && empty($errors)) {
 	<body>
 		<?php $base_url = '../'; require '../includes/header.php'; ?>
 
+		<?php require __DIR__ . '/../includes/right.php'; ?>
+
 		<main class="section">
 			<div class="container">
 				<h1>填寫表單</h1>
@@ -249,13 +318,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $form && empty($errors)) {
 					<div class="panel" style="padding: 20px">
 						<h2><?php echo htmlspecialchars($form['title']); ?></h2>
 						<p class="muted"><?php echo htmlspecialchars($form['description'] ?: '尚未提供表單說明。'); ?></p>
-						<?php if ($form['status'] !== 'published') : ?>
+						<?php if (!empty($form['open_at']) || !empty($form['close_at'])) : ?>
+							<p class="meta" style="margin-top:4px">
+								<?php if (!empty($form['open_at'])) : ?>⏰ 開放：<?php echo date('Y-m-d H:i', strtotime($form['open_at'])); ?><?php endif; ?>
+								<?php if (!empty($form['close_at'])) : ?><?php echo !empty($form['open_at']) ? ' ～ ' : ''; ?>關閉：<?php echo date('Y-m-d H:i', strtotime($form['close_at'])); ?><?php endif; ?>
+							</p>
+						<?php endif; ?>
+						<?php if ($preview && $is_owner) : ?>
+							<p class="muted" style="background:#fff3cd;padding:8px 12px;border-radius:8px;margin-bottom:12px">預覽模式 — 此表單目前為「<?php echo htmlspecialchars($form['status']); ?>」狀態，尚未對外開放。</p>
+							<form method="post" action="./submit.php" onsubmit="alert('此為預覽模式，無法送出');return false">
+						<?php elseif ($form['status'] !== 'published') : ?>
 							<p class="muted">此表單尚未發布，暫時無法填寫。</p>
 						<?php else : ?>
-							<form method="post" action="./submit.php">
+							<form method="post" action="./submit.php" enctype="multipart/form-data" id="submitForm">
+								<?php echo csrf_field(); ?>
 								<input type="hidden" name="form_id" value="<?php echo $form_id; ?>" />
 								<?php foreach ($questions as $q) : ?>
-									<div class="field" style="margin-top: 16px">
+									<div class="field" style="margin-top: 16px" <?php echo $q['is_required'] ? 'data-required="1"' : ''; ?>>
 										<label>
 											<?php echo htmlspecialchars($q['question_text']); ?>
 											<?php if ($q['is_required']) : ?>
@@ -282,7 +361,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $form && empty($errors)) {
 													<?php echo htmlspecialchars($opt['option_text']); ?>
 												</label>
 											<?php endforeach; ?>
+										<?php elseif ($q['question_type'] === 'file_upload') : ?>
+											<input type="file" name="files[<?php echo $q['id']; ?>]" />
+											<p class="muted" style="font-size:0.85rem">支援圖片、PDF、文件檔，上限 5 MB</p>
 										<?php endif; ?>
+										<span class="field-error" style="display:none;color:#dc3545;font-size:0.85rem">此欄位為必填</span>
 									</div>
 								<?php endforeach; ?>
 								<button class="btn btn-primary" type="submit" style="margin-top: 16px">送出</button>

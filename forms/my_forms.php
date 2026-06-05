@@ -2,6 +2,7 @@
 session_start();
 
 require '../includes/db.php';
+require '../includes/csrf.php';
 
 $user_raw = isset($_SESSION['user']) ? $_SESSION['user'] : null;
 $user = !empty($user_raw) ? htmlspecialchars($user_raw) : null;
@@ -36,7 +37,7 @@ try {
 	} else {
 		$is_admin = ($current_user['role'] === 'admin');
 		if ($is_admin) {
-			$stmt = $pdo->query('SELECT f.id, f.title, f.description, f.form_type, f.status, f.created_at, u.username, f.club_id FROM forms f JOIN users u ON u.id = f.creator_id ORDER BY f.created_at DESC');
+			$stmt = $pdo->query('SELECT f.id, f.creator_id, f.title, f.description, f.form_type, f.status, f.created_at, u.username, f.club_id FROM forms f JOIN users u ON u.id = f.creator_id ORDER BY f.created_at DESC');
 			$forms = $stmt->fetchAll();
 		} else {
 			$mem_stmt = $pdo->prepare('SELECT club_id, role FROM club_memberships WHERE user_id = :id');
@@ -47,17 +48,15 @@ try {
 				}
 			}
 			$managed_clubs = array_values(array_unique($managed_clubs));
-			if (!empty($managed_clubs)) {
-				$placeholders = implode(',', array_fill(0, count($managed_clubs), '?'));
-				$stmt = $pdo->prepare('SELECT f.id, f.title, f.description, f.form_type, f.status, f.created_at, u.username, f.club_id FROM forms f JOIN users u ON u.id = f.creator_id WHERE f.club_id IN (' . $placeholders . ') ORDER BY f.created_at DESC');
-				$stmt->execute($managed_clubs);
-				$forms = $stmt->fetchAll();
-			}
+			$stmt = $pdo->prepare('SELECT f.id, f.creator_id, f.title, f.description, f.form_type, f.status, f.created_at, u.username, f.club_id FROM forms f JOIN users u ON u.id = f.creator_id WHERE f.creator_id = ? ORDER BY f.created_at DESC');
+			$stmt->execute([(int) $current_user['id']]);
+			$forms = $stmt->fetchAll();
 		}
 	}
 } catch (Throwable $e) {
 	$errors[] = '表單資料載入失敗，請稍後再試。';
 }
+$is_officer = $is_admin || !empty($managed_clubs);
 ?>
 <!doctype html>
 <html lang="zh-Hant">
@@ -76,10 +75,18 @@ try {
 	<body>
 		<?php $base_url = '../'; require '../includes/header.php'; ?>
 
+		<?php require __DIR__ . '/../includes/right.php'; ?>
+
 		<main class="section">
 			<div class="container">
 				<h1>我的表單</h1>
 				<p class="muted">查看你建立的表單與目前狀態。</p>
+				<?php if (!empty($_SESSION['flash_success'])) : ?>
+					<div class="success"><?php echo htmlspecialchars($_SESSION['flash_success']); unset($_SESSION['flash_success']); ?></div>
+				<?php endif; ?>
+				<?php if (!empty($_SESSION['flash_error'])) : ?>
+					<div class="error"><?php echo htmlspecialchars($_SESSION['flash_error']); unset($_SESSION['flash_error']); ?></div>
+				<?php endif; ?>
 				<?php if (!empty($errors)) : ?>
 					<div class="error">
 						<ul>
@@ -88,11 +95,15 @@ try {
 							<?php endforeach; ?>
 						</ul>
 					</div>
-				<?php elseif (empty($forms)) : ?>
-					<div class="panel" style="padding: 20px">
+			<?php elseif (empty($forms)) : ?>
+				<div class="panel" style="padding: 20px">
+					<?php if ($is_officer) : ?>
 						<p class="muted">目前尚無表單。</p>
 						<a class="btn btn-primary" href="./create.php">建立新表單</a>
-					</div>
+					<?php else : ?>
+						<p class="muted">你尚未建立任何表單。只有社團幹部或持有人可以建立表單。</p>
+					<?php endif; ?>
+				</div>
 				<?php else : ?>
 					<div class="card-grid">
 						<?php foreach ($forms as $index => $form) : ?>
@@ -104,7 +115,9 @@ try {
 								if ($current_user) {
 									if ($is_admin) {
 										$can_edit = true;
-									} elseif (in_array((int) $form['club_id'], $managed_clubs, true)) {
+									} elseif ((int) $form['creator_id'] === (int) $current_user['id']) {
+										$can_edit = true;
+									} elseif ($form['club_id'] && in_array((int) $form['club_id'], $managed_clubs, true)) {
 										$can_edit = true;
 									}
 								}
@@ -121,6 +134,17 @@ try {
 									<?php if ($can_edit) : ?>
 										<a class="btn btn-ghost" href="./edit.php?id=<?php echo (int) $form['id']; ?>">修改表單</a>
 										<a class="btn btn-ghost" href="./statistics.php?id=<?php echo (int) $form['id']; ?>">填寫紀錄</a>
+										<form method="post" action="./copy_form.php" style="display:inline">
+											<?php echo csrf_field(); ?>
+											<input type="hidden" name="id" value="<?php echo (int) $form['id']; ?>" />
+											<button type="submit" class="btn btn-ghost">複製</button>
+										</form>
+										<form method="post" action="./delete.php" style="display:inline">
+											<?php echo csrf_field(); ?>
+											<input type="hidden" name="id" value="<?php echo (int) $form['id']; ?>" />
+											<input type="hidden" name="redirect" value="my_forms.php" />
+											<button type="submit" class="btn btn-ghost" data-confirm="確定要刪除此表單嗎？此操作無法復原。">刪除</button>
+										</form>
 									<?php endif; ?>
 								</div>
 							</article>

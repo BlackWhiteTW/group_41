@@ -2,6 +2,7 @@
 // 表單建立頁面：提供表單內容輸入、題目設定和驗證，提交後儲存到資料庫
 session_start();
 require '../includes/db.php';
+require '../includes/csrf.php';
 
 $user_raw = isset($_SESSION['user']) ? $_SESSION['user'] : null;
 $user = !empty($user_raw) ? htmlspecialchars($user_raw) : null;
@@ -21,11 +22,15 @@ $defaults = [
 	'form_type' => 'public',
 	'club_id' => 0,
 	'target_club_ids' => [],
-	'status' => 'draft'
+	'status' => 'draft',
+	'open_at' => '',
+	'close_at' => '',
+	'allow_resubmit' => 1,
+	'require_login' => 0
 ];
 $question_defaults = [];
 
-$allowed_types = ['short_answer', 'long_answer', 'multiple_choice', 'multi_choice'];
+$allowed_types = ['short_answer', 'long_answer', 'multiple_choice', 'multi_choice', 'file_upload'];
 $allowed_status = ['draft', 'published', 'closed'];
 
 if (!empty($user_raw)) {
@@ -89,60 +94,69 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST' && $defaults['form_type'] === 'club_on
 	}
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-	$defaults['title'] = trim(isset($_POST['title']) ? $_POST['title'] : '');
-	$defaults['description'] = trim(isset($_POST['description']) ? $_POST['description'] : '');
-	$defaults['form_type'] = isset($_POST['form_type']) ? $_POST['form_type'] : 'public';
-	$defaults['club_id'] = isset($_POST['club_id']) ? (int) $_POST['club_id'] : 0;
-	$target_input = isset($_POST['target_club_ids']) ? $_POST['target_club_ids'] : [];
-	if (!is_array($target_input)) {
-		$target_input = [$target_input];
-	}
-	$target_input = array_values(array_filter(array_map('trim', $target_input), 'strlen'));
-	$target_input = array_values(array_unique(array_map('intval', $target_input)));
-	$defaults['target_club_ids'] = $target_input;
-	$defaults['status'] = isset($_POST['status']) ? $_POST['status'] : 'draft';
-
-	$questions_input = (isset($_POST['questions']) && is_array($_POST['questions'])) ? $_POST['questions'] : [];
-	foreach ($questions_input as $q) {
-		$text = trim(isset($q['text']) ? $q['text'] : '');
-		$type = isset($q['type']) ? $q['type'] : 'short_answer';
-		$required = !empty($q['required']);
-		$options_raw = (isset($q['options']) && is_array($q['options'])) ? $q['options'] : [];
-		$options = [];
-		foreach ($options_raw as $opt) {
-			$options[] = trim($opt);
+	if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+		if (!csrf_verify($_POST['csrf_token'] ?? '')) {
+			$errors[] = '表單驗證失敗，請重新整理後再試。';
 		}
-		if (count($options) < 2) {
-			$options = array_pad($options, 2, '');
+		$defaults['title'] = trim(isset($_POST['title']) ? $_POST['title'] : '');
+		$defaults['description'] = trim(isset($_POST['description']) ? $_POST['description'] : '');
+		$defaults['form_type'] = isset($_POST['form_type']) ? $_POST['form_type'] : 'public';
+		$defaults['club_id'] = isset($_POST['club_id']) ? (int) $_POST['club_id'] : 0;
+		$target_input = isset($_POST['target_club_ids']) ? $_POST['target_club_ids'] : [];
+		if (!is_array($target_input)) {
+			$target_input = [$target_input];
 		}
-		$question_defaults[] = [
-			'text' => $text,
-			'type' => $type,
-			'required' => $required,
-			'options' => $options
-		];
-	}
+		$target_input = array_values(array_filter(array_map('trim', $target_input), 'strlen'));
+		$target_input = array_values(array_unique(array_map('intval', $target_input)));
+		$defaults['target_club_ids'] = $target_input;
+		$defaults['status'] = isset($_POST['status']) ? $_POST['status'] : 'draft';
+		$defaults['open_at'] = isset($_POST['open_at']) ? trim($_POST['open_at']) : '';
+		$defaults['close_at'] = isset($_POST['close_at']) ? trim($_POST['close_at']) : '';
+		$defaults['allow_resubmit'] = empty($_POST['allow_resubmit']) ? 0 : 1;
+		$defaults['require_login'] = empty($_POST['require_login']) ? 0 : 1;
 
-	if (empty($user_raw)) {
-		$errors[] = '請先登入才能建立表單。';
-	}
-	if ($defaults['title'] === '') {
-		$errors[] = '請輸入表單標題。';
-	}
+		$questions_input = (isset($_POST['questions']) && is_array($_POST['questions'])) ? $_POST['questions'] : [];
+		foreach ($questions_input as $q) {
+			$text = trim(isset($q['text']) ? $q['text'] : '');
+			$type = isset($q['type']) ? $q['type'] : 'short_answer';
+			$required = !empty($q['required']);
+			$options_raw = (isset($q['options']) && is_array($q['options'])) ? $q['options'] : [];
+			$options = [];
+			foreach ($options_raw as $opt) {
+				$options[] = trim($opt);
+			}
+			if (count($options) < 2) {
+				$options = array_pad($options, 2, '');
+			}
+			$question_defaults[] = [
+				'text' => $text,
+				'type' => $type,
+				'required' => $required,
+				'options' => $options
+			];
+		}
 
-	if (!in_array($defaults['form_type'], ['public', 'club_only'], true)) {
-		$defaults['form_type'] = 'public';
-	}
-	if (!in_array($defaults['status'], $allowed_status, true)) {
-		$defaults['status'] = 'draft';
-	}
-	if ($defaults['club_id'] === 0) {
-		$errors[] = '請選擇發布社團。';
-	} elseif (!isset($club_map[$defaults['club_id']])) {
-		$errors[] = '發布社團不存在。';
-	}
-	if (!$can_select_any && !empty($managed_clubs) && $defaults['club_id'] !== 0 && !in_array($defaults['club_id'], $managed_clubs, true)) {
+		if (empty($user_raw)) {
+			$errors[] = '請先登入才能建立表單。';
+		}
+		if ($defaults['title'] === '') {
+			$errors[] = '請輸入表單標題。';
+		}
+
+		if (!in_array($defaults['form_type'], ['public', 'club_only'], true)) {
+			$defaults['form_type'] = 'public';
+		}
+		if (!in_array($defaults['status'], $allowed_status, true)) {
+			$defaults['status'] = 'draft';
+		}
+		if ($defaults['club_id'] === 0) {
+			if (!$can_select_any) {
+				$errors[] = '請選擇發布社團。';
+			}
+		} elseif (!isset($club_map[$defaults['club_id']])) {
+			$errors[] = '發布社團不存在。';
+		}
+		if (!$can_select_any && !empty($managed_clubs) && $defaults['club_id'] !== 0 && !in_array($defaults['club_id'], $managed_clubs, true)) {
 		$errors[] = '你只能選擇自己擔任幹部或持有人的社團。';
 		$defaults['club_id'] = (int) $managed_clubs[0];
 	}
@@ -204,15 +218,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 			}
 
 			$target_club_ids = ($defaults['form_type'] === 'club_only') ? implode(',', $defaults['target_club_ids']) : null;
-			$f = $pdo->prepare('INSERT INTO forms (creator_id, club_id, title, description, form_type, target_club_ids, status) VALUES (:c, :club, :t, :d, :ft, :tc, :s)');
+			$db_open_at = $defaults['open_at'] ? str_replace('T', ' ', $defaults['open_at']) . ':00' : null;
+			$db_close_at = $defaults['close_at'] ? str_replace('T', ' ', $defaults['close_at']) . ':00' : null;
+			$f = $pdo->prepare('INSERT INTO forms (creator_id, club_id, title, description, form_type, target_club_ids, status, open_at, close_at, allow_resubmit, require_login) VALUES (:c, :club, :t, :d, :ft, :tc, :s, :oa, :ca, :ar, :rl)');
 			$f->execute([
 				':c' => $user_row['id'],
-				':club' => $defaults['club_id'],
+				':club' => $defaults['club_id'] ?: null,
 				':t' => $defaults['title'],
 				':d' => $defaults['description'] ?: null,
 				':ft' => $defaults['form_type'],
 				':tc' => $target_club_ids,
-				':s' => $defaults['status']
+				':s' => $defaults['status'],
+				':oa' => $db_open_at,
+				':ca' => $db_close_at,
+				':ar' => $defaults['allow_resubmit'],
+				':rl' => $defaults['require_login']
 			]);
 			$form_id = (int) $pdo->lastInsertId();
 
@@ -238,7 +258,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 				}
 			}
 			$pdo->commit();
-			header('Location: ./forms/view.php?id=' . $form_id);
+			header('Location: view.php?id=' . $form_id);
 			exit();
 		} catch (Throwable $e) {
 			if (!empty($pdo) && $pdo->inTransaction()) {
@@ -275,6 +295,8 @@ if (empty($question_defaults)) {
 	<body>
 		<?php $base_url = '../'; require '../includes/header.php'; ?>
 
+		<?php require __DIR__ . '/../includes/right.php'; ?>
+
 		<main class="section">
 			<div class="container">
 				<h1>建立表單</h1>
@@ -292,6 +314,7 @@ if (empty($question_defaults)) {
 					</div>
 				<?php endif; ?>
 				<form class="panel" style="padding: 20px" method="post" action="./create.php">
+					<?php echo csrf_field(); ?>
 					<div class="field">
 						<label for="title">表單標題</label>
 						<input id="title" name="title" required value="<?php echo htmlspecialchars($defaults['title']); ?>" />
@@ -304,6 +327,9 @@ if (empty($question_defaults)) {
 						<label for="club_id">發布社團</label>
 						<?php if (!empty($club_options)) : ?>
 							<select id="club_id" name="club_id">
+								<?php if ($can_select_any) : ?>
+									<option value="0" <?php echo $defaults['club_id'] === 0 ? 'selected' : ''; ?>>系統全域表單（非社團）</option>
+								<?php endif; ?>
 								<?php foreach ($club_options as $club_row) : ?>
 									<option value="<?php echo (int) $club_row['id']; ?>" <?php echo $defaults['club_id'] === (int) $club_row['id'] ? 'selected' : ''; ?>>
 										<?php echo htmlspecialchars($club_row['name']); ?>
@@ -313,7 +339,7 @@ if (empty($question_defaults)) {
 						<?php else : ?>
 							<input id="club_id" name="club_id" placeholder="尚無可選社團" disabled />
 						<?php endif; ?>
-						<p class="muted" style="margin-top: 6px">需為該社團幹部或持有人才能建立表單。</p>
+						<p class="muted" style="margin-top: 6px">管理員可建立系統全域表單（非社團）。需為該社團幹部或持有人才能建立社團表單。</p>
 					</div>
 					<div class="field">
 						<label for="form_type">表單類型</label>
@@ -349,6 +375,30 @@ if (empty($question_defaults)) {
 							<option value="closed" <?php echo $defaults['status'] === 'closed' ? 'selected' : ''; ?>>關閉</option>
 						</select>
 					</div>
+					<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+						<div class="field">
+							<label for="open_at">預定開放時間 <span class="muted">（可選）</span></label>
+							<input type="datetime-local" id="open_at" name="open_at" value="<?php echo htmlspecialchars($defaults['open_at']); ?>" />
+						</div>
+						<div class="field">
+							<label for="close_at">預定關閉時間 <span class="muted">（可選）</span></label>
+							<input type="datetime-local" id="close_at" name="close_at" value="<?php echo htmlspecialchars($defaults['close_at']); ?>" />
+						</div>
+					</div>
+				<div class="field">
+					<label class="check-row">
+						<input type="checkbox" name="allow_resubmit" value="1" <?php echo $defaults['allow_resubmit'] ? 'checked' : ''; ?> />
+						允許重複填答
+					</label>
+					<p class="muted">取消勾選則每人僅能填寫一次（需登入才能偵測）。</p>
+				</div>
+				<div class="field">
+					<label class="check-row">
+						<input type="checkbox" name="require_login" value="1" <?php echo $defaults['require_login'] ? 'checked' : ''; ?> />
+						需登入才能填寫
+					</label>
+					<p class="muted">勾選後未登入使用者無法填寫此表單。</p>
+				</div>
 
 					<h2 style="margin-top: 24px">題目設定</h2>
 					<div id="questionList" data-next-index="<?php echo count($question_defaults); ?>">
@@ -366,6 +416,7 @@ if (empty($question_defaults)) {
 										<option value="long_answer" <?php echo $q['type'] === 'long_answer' ? 'selected' : ''; ?>>長答</option>
 										<option value="multiple_choice" <?php echo $q['type'] === 'multiple_choice' ? 'selected' : ''; ?>>單選</option>
 										<option value="multi_choice" <?php echo $q['type'] === 'multi_choice' ? 'selected' : ''; ?>>多選</option>
+									<option value="file_upload" <?php echo $q['type'] === 'file_upload' ? 'selected' : ''; ?>>檔案上傳</option>
 									</select>
 								</div>
 								<div class="field">
@@ -387,6 +438,8 @@ if (empty($question_defaults)) {
 									<button class="btn btn-ghost btn-small" type="button" data-action="add-option" data-question="<?php echo $index; ?>">新增選項</button>
 								</div>
 								<div class="question-actions">
+									<button class="btn btn-ghost btn-small" type="button" data-action="move-up">上移</button>
+									<button class="btn btn-ghost btn-small" type="button" data-action="move-down">下移</button>
 									<button class="btn btn-ghost btn-small" type="button" data-action="remove-question">刪除題目</button>
 								</div>
 							</div>
@@ -406,6 +459,7 @@ if (empty($question_defaults)) {
 									<option value="long_answer">長答</option>
 									<option value="multiple_choice">單選</option>
 									<option value="multi_choice">多選</option>
+									<option value="file_upload">檔案上傳</option>
 								</select>
 							</div>
 							<div class="field">
@@ -428,10 +482,12 @@ if (empty($question_defaults)) {
 								</div>
 								<button class="btn btn-ghost btn-small" type="button" data-action="add-option" data-question="__INDEX__">新增選項</button>
 							</div>
-							<div class="question-actions">
-								<button class="btn btn-ghost btn-small" type="button" data-action="remove-question">刪除題目</button>
+						<div class="question-actions">
+									<button class="btn btn-ghost btn-small" type="button" data-action="move-up">上移</button>
+									<button class="btn btn-ghost btn-small" type="button" data-action="move-down">下移</button>
+									<button class="btn btn-ghost btn-small" type="button" data-action="remove-question">刪除題目</button>
+								</div>
 							</div>
-						</div>
 					</template>
 
 					<div style="margin-top: 20px">
@@ -443,7 +499,7 @@ if (empty($question_defaults)) {
 		</main>
 
 		<footer class="footer container">社團表單系統</footer>
-		<script src="./js/app.js"></script>
+		<script src="../js/app.js"></script>
 	</body>
 </html>
 

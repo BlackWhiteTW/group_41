@@ -1,0 +1,135 @@
+/* ── Club Settings ── */
+.setting-layout {
+  display: grid;
+  gap: 24px;
+}
+
+.club-selector {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 16px 20px;
+}
+
+.club-selector label {
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+
+.club-selector select {
+  width: auto;
+  min-width: 200px;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px 0;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.section-title h3 {
+  margin: 0;
+}
+
+.mgmt-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.mgmt-grid .panel {
+  padding: 20px;
+}
+
+/* ── Search Bar ── */
+.search-bar {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.search-bar .field {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+/* ── Pagination ── */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  margin-top: 20px;
+}
+
+/* ── Activity Log ── */
+.log-scroll {
+  max-height: 350px;
+  overflow-y: auto;
+}
+
+.log-scroll .data-table td {
+  font-size: 0.85rem;
+}
+
+/* ── Announcements ── */
+.announce-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.announce-item {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.announce-item:last-child {
+  border-bottom: none;
+}
+
+/* ── Club Card Tags ── */
+.club-tags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.club-tags .pill.private {
+  background: #f3e8fa;
+  color: #7a3b9e;
+}
+
+/* ── Responsive ── */
+@media (max-width: 700px) {
+  .mgmt-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .club-selector {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .club-selector select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .setting-layout {
+    gap: 16px;
+  }
+
+  .search-bar {
+    flex-direction: column;
+  }
+
+  .search-bar .btn {
+    width: 100%;
+  }
+}
