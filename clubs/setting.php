@@ -83,7 +83,7 @@ try {
         }
     }
 } catch (Throwable $e) {
-    $errors[] = '系統錯誤：' . $e->getMessage();
+    $errors[] = '系統錯誤，請稍後再試。';
 }
 ?>
 <!doctype html>

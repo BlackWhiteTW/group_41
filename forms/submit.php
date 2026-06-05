@@ -3,6 +3,7 @@ session_start();
 
 require '../includes/db.php';
 require '../includes/csrf.php';
+require '../includes/functions.php';
 
 $user_raw = isset($_SESSION['user']) ? $_SESSION['user'] : null;
 $user = !empty($user_raw) ? htmlspecialchars($user_raw) : null;
@@ -18,16 +19,6 @@ $options_map = [];
 $errors = [];
 $target_clubs = [];
 $is_owner = false;
-
-function parse_target_clubs($value)
-{
-	if (!is_string($value) || trim($value) === '') {
-		return [];
-	}
-	$items = array_map('trim', explode(',', $value));
-	$items = array_values(array_filter($items, 'strlen'));
-	return array_values(array_unique(array_map('intval', $items)));
-}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	if (!csrf_verify($_POST['csrf_token'] ?? '')) {
@@ -247,7 +238,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $form && empty($errors)) {
 					$file_name = isset($_FILES['files']['name'][$qid]) ? $_FILES['files']['name'][$qid] : '';
 					if (!empty($file_name) && $_FILES['files']['error'][$qid] === UPLOAD_ERR_OK) {
 						$ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
-						$stored_name = $submission_id . '_' . $qid . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+						$stored_name = $submission_id . '_' . $qid . '_' . bin2hex(random_bytes(16)) . '.' . $ext;
 						$dest = __DIR__ . '/../uploads/' . $stored_name;
 						if (move_uploaded_file($_FILES['files']['tmp_name'][$qid], $dest)) {
 							$a->execute([

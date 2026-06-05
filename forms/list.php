@@ -91,12 +91,6 @@ try {
 				<h1>表單列表</h1>
 				<p class="muted">瀏覽可查看、可填寫與可管理的表單。</p>
 
-				<?php if (!empty($_SESSION['flash_success'])) : ?>
-					<div class="success"><?php echo htmlspecialchars($_SESSION['flash_success']); unset($_SESSION['flash_success']); ?></div>
-				<?php endif; ?>
-				<?php if (!empty($_SESSION['flash_error'])) : ?>
-					<div class="error"><?php echo htmlspecialchars($_SESSION['flash_error']); unset($_SESSION['flash_error']); ?></div>
-				<?php endif; ?>
 				<?php if (!empty($errors)) : ?>
 					<div class="error">
 						<ul>

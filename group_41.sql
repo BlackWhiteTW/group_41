@@ -295,3 +295,229 @@ INSERT INTO club_memberships (user_id, club_id, role) VALUES
 (2, 1, 'club_officer'),
 (2, 2, 'club_officer'),
 (3, 1, 'member');
+
+-- ════════════════════════════════════════════════════
+-- 擴充測試資料：更多使用者、社團、表單與互動記錄
+-- ════════════════════════════════════════════════════
+
+-- 更多測試使用者（密碼皆為 test123456 的 bcrypt 雜湊）
+INSERT INTO users (username, password, email, role) VALUES
+('officer2', '$2y$10$8JCtOtpvcSLCLrurStPTQOFD/vyQOTMdVH0TGYRV./RQ6gomgZ5Ge', 'officer2@school.edu', 'club_officer'),
+('member2',  '$2y$10$8JCtOtpvcSLCLrurStPTQOFD/vyQOTMdVH0TGYRV./RQ6gomgZ5Ge', 'member2@school.edu',  'member'),
+('member3',  '$2y$10$8JCtOtpvcSLCLrurStPTQOFD/vyQOTMdVH0TGYRV./RQ6gomgZ5Ge', 'member3@school.edu',  'member');
+
+-- 更多社團（多樣化 join_mode 與 visibility）
+INSERT INTO clubs (name, description, owner_user_id, join_mode, visibility) VALUES
+('攝影社', '捕捉光影之美，學習攝影技巧與後製。', 4, 'open', 'public'),
+('音樂社', '不論樂器或歌唱，一起享受音樂的樂趣。', 4, 'request', 'public'),
+('運動社', '籃球、羽球、排球等多項運動交流。', 1, 'open', 'public'),
+('讀書會', '每週進行書籍討論與心得分享。', 1, 'invite_only', 'public'),
+('實驗社', '不公開的實驗性社團。', 1, 'invite_only', 'private');
+
+-- ═══ 社團成員關聯（交叉加入，展現多樣關係）═══
+INSERT INTO club_memberships (user_id, club_id, role) VALUES
+-- 攝影社（club_id=3）：officer2 是持有人，member2 成員
+(4, 3, 'club_officer'),
+(5, 3, 'member'),
+-- 音樂社（club_id=4）：officer2 是持有人
+(4, 4, 'club_officer'),
+-- 運動社（club_id=5）：admin 是持有人，member 和 member2 加入
+(2, 5, 'member'),
+(3, 5, 'member'),
+(5, 5, 'member'),
+-- 讀書會（club_id=6）：member3 是成員
+(6, 6, 'member'),
+-- member 也在資訊社（club_id=2）以 member 身份
+(3, 2, 'member');
+
+-- ═══ 表單（涵蓋各種狀態與類型組合）═══
+INSERT INTO forms (creator_id, club_id, title, description, form_type, status, allow_resubmit, require_login) VALUES
+-- 已發布的全域公開表單
+(1, NULL, '校園活動滿意度調查', '請協助填寫本學期校園活動的滿意度。', 'public', 'published', 1, 0),
+-- 已發布的社團限定表單（學生會）
+(2, 1, '學生會意見回饋', '對學生會運作的建議與回饋。', 'club_only', 'published', 1, 1),
+-- 已關閉表單
+(1, NULL, '上學期課程問卷', '已截止的課程問卷調查。', 'public', 'closed', 0, 0),
+-- 草稿表單
+(4, 4, '音樂社社員登記', '請音樂社社員填寫基本資料與樂器專長。', 'club_only', 'draft', 1, 1),
+-- 另一份已發布表單（資訊社）
+(2, 2, '資訊社活動提案', '提案下學期想舉辦的資訊相關活動。', 'club_only', 'published', 1, 1),
+-- 已發布的開放表單（攝影社）
+(4, 3, '攝影比賽報名', '校內攝影比賽線上報名。', 'club_only', 'published', 0, 1);
+
+-- ═══ 表單題目（多樣化題型）═══
+-- 表單 1：校園活動滿意度調查（已發布，全域）
+INSERT INTO form_questions (form_id, question_order, question_text, question_type, is_required) VALUES
+(1, 1, '你對本學期校園活動的整體滿意度如何？', 'multiple_choice', 1),
+(1, 2, '你最喜歡哪一類型的活動？', 'short_answer', 1),
+(1, 3, '請寫下你對校園活動的建議。', 'long_answer', 0);
+
+-- 表單 2：學生會意見回饋（已發布，club_only）
+INSERT INTO form_questions (form_id, question_order, question_text, question_type, is_required) VALUES
+(2, 1, '你認為學生會在本學期的表現如何？', 'multiple_choice', 1),
+(2, 2, '你希望學生會加強哪些服務？（可複選）', 'multi_choice', 1),
+(2, 3, '其他具體建議', 'long_answer', 0);
+
+-- 表單 3：上學期課程問卷（已關閉）
+INSERT INTO form_questions (form_id, question_order, question_text, question_type, is_required) VALUES
+(3, 1, '這門課的教學品質如何？', 'multiple_choice', 1),
+(3, 2, '你對教材的滿意度？', 'multiple_choice', 1);
+
+-- 表單 5：資訊社活動提案（已發布，club_only）
+INSERT INTO form_questions (form_id, question_order, question_text, question_type, is_required) VALUES
+(5, 1, '請簡述你的活動提案名稱。', 'short_answer', 1),
+(5, 2, '活動類型', 'multiple_choice', 1),
+(5, 3, '請上傳活動企劃書（如有）。', 'file_upload', 0);
+
+-- 表單 6：攝影比賽報名（已發布，club_only）
+INSERT INTO form_questions (form_id, question_order, question_text, question_type, is_required) VALUES
+(6, 1, '參賽者姓名', 'short_answer', 1),
+(6, 2, '參賽組別', 'multiple_choice', 1),
+(6, 3, '作品主題', 'short_answer', 1);
+
+-- ═══ 選擇題選項 ═══
+-- 表單 1 題目 1（question_id=1）：滿意度
+INSERT INTO question_options (question_id, option_text, option_order) VALUES
+(1, '非常滿意', 1),
+(1, '滿意', 2),
+(1, '普通', 3),
+(1, '不滿意', 4),
+(1, '非常不滿意', 5);
+
+-- 表單 2 題目 1（question_id=4）：學生會表現
+INSERT INTO question_options (question_id, option_text, option_order) VALUES
+(4, '非常良好', 1),
+(4, '良好', 2),
+(4, '尚可', 3),
+(4, '不佳', 4);
+
+-- 表單 2 題目 2（question_id=5）：希望加強服務（多選）
+INSERT INTO question_options (question_id, option_text, option_order) VALUES
+(5, '學術講座', 1),
+(5, '社團補助', 2),
+(5, '活動宣傳', 3),
+(5, '校園環境', 4),
+(5, '學生權益', 5);
+
+-- 表單 3 題目 1（question_id=7）：教學品質
+INSERT INTO question_options (question_id, option_text, option_order) VALUES
+(7, '非常好', 1),
+(7, '好', 2),
+(7, '普通', 3),
+(7, '差', 4);
+
+-- 表單 3 題目 2（question_id=8）：教材滿意度
+INSERT INTO question_options (question_id, option_text, option_order) VALUES
+(8, '非常滿意', 1),
+(8, '滿意', 2),
+(8, '普通', 3),
+(8, '不滿意', 4);
+
+-- 表單 5 題目 2（question_id=10）：活動類型
+INSERT INTO question_options (question_id, option_text, option_order) VALUES
+(10, '程式競賽', 1),
+(10, '技術講座', 2),
+(10, '黑客松', 3),
+(10, '社群交流', 4);
+
+-- 表單 6 題目 2（question_id=13）：參賽組別
+INSERT INTO question_options (question_id, option_text, option_order) VALUES
+(13, '風景組', 1),
+(13, '人像組', 2),
+(13, '生態組', 3),
+(13, '創意組', 4);
+
+-- ═══ 表單填寫記錄 ═══
+INSERT INTO form_submissions (form_id, user_id) VALUES
+(1, 3),  (1, 5),  (1, 6),  (1, NULL),  (1, 2),  (1, NULL),
+(2, 3),  (2, 2),
+(3, 3),  (3, 5);
+
+-- ═══ 答案明細 ═══
+-- 表單 1 的提交 (submission 1-6)
+-- 提交 1：member 填寫（滿意度：滿意，最愛：社團博覽會，建議：無）
+INSERT INTO answers (submission_id, question_id, option_id) VALUES (1, 1, 2);
+INSERT INTO answers (submission_id, question_id, answer_text) VALUES (1, 2, '社團博覽會');
+INSERT INTO answers (submission_id, question_id, answer_text) VALUES (1, 3, '希望增加更多社團聯合活動。');
+
+-- 提交 2：member2 填寫
+INSERT INTO answers (submission_id, question_id, option_id) VALUES (2, 1, 1);
+INSERT INTO answers (submission_id, question_id, answer_text) VALUES (2, 2, '運動會');
+INSERT INTO answers (submission_id, question_id, answer_text) VALUES (2, 3, NULL);
+
+-- 提交 3：member3 填寫
+INSERT INTO answers (submission_id, question_id, option_id) VALUES (3, 1, 3);
+INSERT INTO answers (submission_id, question_id, answer_text) VALUES (3, 2, '校園演唱會');
+
+-- 提交 4：匿名填寫
+INSERT INTO answers (submission_id, question_id, option_id) VALUES (4, 1, 4);
+INSERT INTO answers (submission_id, question_id, answer_text) VALUES (4, 2, '都還好');
+
+-- 提交 5：officer 填寫
+INSERT INTO answers (submission_id, question_id, option_id) VALUES (5, 1, 2);
+INSERT INTO answers (submission_id, question_id, answer_text) VALUES (5, 2, '社團博覽會');
+INSERT INTO answers (submission_id, question_id, answer_text) VALUES (5, 3, '希望能延長活動時間。');
+
+-- 提交 6：匿名填寫
+INSERT INTO answers (submission_id, question_id, option_id) VALUES (6, 1, 2);
+
+-- 表單 2 的提交 (submission 7-8)：form 2 的題目為 Q4(選擇), Q5(多選), Q6(長答)
+-- 提交 7：member 填寫（表現：良好=option 7，服務：學術講座=option 10 + 社團補助=option 11）
+INSERT INTO answers (submission_id, question_id, option_id) VALUES (7, 4, 7);
+INSERT INTO answers (submission_id, question_id, option_id) VALUES (7, 5, 10);
+INSERT INTO answers (submission_id, question_id, option_id) VALUES (7, 5, 11);
+
+-- 提交 8：officer 填寫（表現：良好=option 7，服務：學生權益=option 14，建議：加強宿舍管理）
+INSERT INTO answers (submission_id, question_id, option_id) VALUES (8, 4, 7);
+INSERT INTO answers (submission_id, question_id, option_id) VALUES (8, 5, 14);
+INSERT INTO answers (submission_id, question_id, answer_text) VALUES (8, 6, '建議加強宿舍管理。');
+
+-- 表單 3 的提交 (submission 9-10)：form 3 的題目為 Q7(選擇), Q8(選擇)
+INSERT INTO answers (submission_id, question_id, option_id) VALUES (9, 7, 16);
+INSERT INTO answers (submission_id, question_id, option_id) VALUES (9, 8, 21);
+INSERT INTO answers (submission_id, question_id, option_id) VALUES (10, 7, 15);
+INSERT INTO answers (submission_id, question_id, option_id) VALUES (10, 8, 19);
+
+-- ═══ 社團公告 ═══
+INSERT INTO club_announcements (club_id, user_id, title, content) VALUES
+(1, 2, '學生會期末大會通知', '本學期期末大會將於 6/15 下午 3 點在活動中心舉行，請各位成員踴躍參加。'),
+(1, 2, '學生會幹部改選公告', '下學期學生會幹部改選將於 6/20 開始受理報名。'),
+(2, 2, '資訊社迎新活動', '歡迎新社員！本週五晚上 7 點將舉辦迎新茶會。'),
+(3, 4, '攝影社外拍活動', '本週六早上 8 點校門口集合，前往陽明山外拍，請自備器材。'),
+(5, 2, '運動社友誼賽', '下週三與隔壁大學舉辦籃球友誼賽，歡迎大家報名參加。');
+
+-- ═══ 社團活動記錄（稽核日誌）═══
+INSERT INTO club_activity_log (club_id, user_id, action, details) VALUES
+(1, 2, '建立社團', '創建學生會社團'),
+(1, 2, '新增成員', '邀請 member 加入學生會'),
+(1, 2, '發布公告', '發布「學生會期末大會通知」'),
+(2, 2, '建立社團', '創建資訊社社團'),
+(2, 2, '新增成員', '邀請 member 加入資訊社'),
+(2, 2, '建立表單', '建立表單「資訊社活動提案」'),
+(3, 4, '建立社團', '創建攝影社社團'),
+(3, 4, '新增成員', '邀請 member2 加入攝影社'),
+(3, 4, '建立表單', '建立表單「攝影比賽報名」'),
+(4, 4, '建立社團', '創建音樂社社團'),
+(4, 4, '建立表單', '建立表單「音樂社社員登記」（草稿）'),
+(5, 1, '建立社團', '創建運動社社團'),
+(1, 2, '修改設定', '更新社團簡介');
+
+-- ═══ 社團邀請記錄 ═══
+INSERT INTO club_invitations (club_id, user_id, invited_by, status) VALUES
+-- 已接受
+(1, 5, 2, 'accepted'),
+-- 待處理
+(2, 6, 2, 'pending'),
+(3, 6, 4, 'pending'),
+-- 已拒絕
+(4, 3, 4, 'declined');
+
+-- ═══ 社團加入申請 ═══
+INSERT INTO club_join_requests (club_id, user_id, status) VALUES
+-- 已核准
+(5, 3, 'approved'),
+-- 待審核
+(1, 6, 'pending'),
+(2, 5, 'pending'),
+-- 已拒絕
+(3, 2, 'rejected');

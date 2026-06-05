@@ -1,100 +1,126 @@
 # 社團表單系統（Group_41）說明
 
-此專案為一個簡易的社團表單系統（PHP + MySQL），包含建立表單、填寫、統計、社團管理與使用者驗證等功能。此文件說明各資料夾的主要用途、重要檔案，以及建議的分類與備份/搬移指令。
+此專案為社團問卷發布與填寫系統（PHP + MySQL），包含建立表單、填寫、統計、社團管理與使用者驗證等功能。
 
-## 快速說明
+## 環境需求
 
-- 必要環境：PHP 7.4+、MySQL、Apache（可使用 XAMPP）
+- PHP 7.4+、MySQL、Apache（可使用 XAMPP）
 - 初始化：匯入 `group_41.sql`，並在 `includes/db.php` 設定資料庫連線資訊
 - 專案入口：`index.php`
 
-## 資料夾說明（逐一說明主要用途與重要檔案）
+## 專案結構
 
-- **admin/**：管理員專用工具與管理頁面
-  - 功能：系統安裝/初始化、簡易 debug、檢視 SQL、管理後台入口
-  - 重要檔案：`admin/index.php`、`admin/install.php`、`admin/sql_view.php`、`admin/debug_assets.php`
+### 根目錄
+| 檔案 | 用途 |
+|------|------|
+| `index.php` | 首頁（公開表單總覽 + 系統統計） |
+| `login.php` | 登入頁面 |
+| `logout.php` | 登出處理 |
+| `register.php` | 註冊頁面 |
+| `forgot_password.php` | 忘記密碼（產生重設連結） |
+| `reset_password.php` | 重設密碼（驗證 token） |
+| `group_41.sql` | 完整資料庫結構 + 測試資料 |
 
-- **api/**：給前端或 AJAX 的輕量 API（無視圖）
-  - 功能：回傳 JSON / 檢查值（例如帳號是否存在）
-  - 重要檔案：`api/check_username.php`
+### admin/ — 管理員專用工具
+| 檔案 | 用途 |
+|------|------|
+| `admin_index.php` | 管理控制台（系統概況 + 管理工具入口） |
+| `user_CRUD.php` | 使用者管理（建立 / 編輯 / 刪除 / 角色 / 社團關聯） |
+| `forms_CRUD.php` | 表單管理（搜尋 / 狀態篩選 / 刪除 / 跳轉編輯） |
+| `clubs_CRUD.php` | 社團管理（編輯 / 持有人轉移 / 刪除 / 成員檢視） |
+| `activity_log.php` | 活動記錄（全系統社團操作稽核日誌） |
+| `sql_view.php` | SQL 資料檢視（14 張資料表瀏覽） |
+| `sql_reset.php` | 資料庫重新匯入（POST + CSRF 保護） |
+| `test.php` | 簡易系統測試（檔案 / 資料庫 / 環境檢查） |
 
-- **archive/**：歷史程式碼或備份（不可直接使用的舊版）
-  - 目前包含 `php_legacy/`（舊版程式碼與 includes）
-  - 若保留歷史紀錄，請維持此處不放在公開路徑下供測試用
+### api/ — AJAX API
+| 檔案 | 用途 |
+|------|------|
+| `check_username.php` | 檢查帳號是否可用（JSON 回傳） |
 
-- **clubs/**：社團管理相關頁面
-  - 功能：建立社團、管理社團（幹部權限、成員管理）
-  - 重要檔案：`clubs/create.php`、`clubs/manage.php`
+### clubs/ — 社團管理
+| 檔案 | 用途 |
+|------|------|
+| `clubs_index.php` | 社團中心（列表 / 搜尋 / 加入操作） |
+| `create.php` | 建立新社團 |
+| `manage.php` | 社團資訊（成員 / 表單 / 公告） |
+| `setting.php` | 社團設定（基本資料 / 公告 / 成員管理 / 邀請 / 審核 / 活動記錄） |
+| `update_setting.php` | POST 處理（所有社團操作） |
 
-- **forms/**：表單核心功能與使用者互動頁面
-  - 功能：建立/修改/檢視/填寫表單、查看統計、列出表單等
-  - 重要檔案：`forms/create.php`、`forms/edit.php`、`forms/list.php`、`forms/view.php`、`forms/submit.php`、`forms/success.php`、`forms/statistics.php`
-  - 備註：`forms/save_form.php` 目前內容僅為重導（`Location: ./create.php`），專案中沒有其他程式引用；可視為可刪除或先備份再移除。
+### forms/ — 表單核心
+| 檔案 | 用途 |
+|------|------|
+| `forms_index.php` | 表單中心（統計 + 近期表單 + 快速連結） |
+| `create.php` | 建立表單（完整表單建構器） |
+| `edit.php` | 編輯表單（雙模式：列表 / 編輯特定表單） |
+| `view.php` | 檢視表單（權限控制 + 填寫入口） |
+| `submit.php` | 提交表單（驗證 + 檔案上傳 + 儲存） |
+| `list.php` | 表單列表（瀏覽 + 管理控制） |
+| `my_forms.php` | 我的表單（建立者管理檢視） |
+| `statistics.php` | 統計（圖表 + CSV 匯出 + 逐筆檢視） |
+| `copy_form.php` | 複製表單（POST） |
+| `delete.php` | 刪除表單（POST + 檔案清理） |
+| `download.php` | 檔案下載 / 預覽（權限控制） |
+| `edit_submission.php` | 編輯已提交的回應 |
+| `success.php` | 提交成功頁面 |
 
-- **includes/**：共用程式與頁首/頁尾、資料庫連線等
-  - 重要檔案：`includes/db.php`（資料庫連線）、`includes/header.php`、`includes/footer.php`（若存在）、`includes/login_auth.php`
+### includes/ — 共用程式
+| 檔案 | 用途 |
+|------|------|
+| `db.php` | PDO 資料庫連線 + `get_db()` 函數 |
+| `cookies.php` | Session / Cookie / 記住我（Remember-me）管理 |
+| `csrf.php` | CSRF 防護（產生 / 驗證 / 欄位） |
+| `admin_auth.php` | 集中式管理員授權檢查 |
+| `header.php` | 全域頂部導覽列 + SweetAlert2 + Flash 訊息 |
+| `login_auth.php` | 密碼驗證輔助函數（bcrypt + SHA256 相容） |
+| `right.php` | 左側側邊欄（自動偵測區域 + 連結） |
 
-- **css/**：樣式表（靜態資源）
-  - 包含：`app.css`、`bootstrap.min.css`、`datatables.css`、`style.css` 等
+### users/ — 使用者中心
+| 檔案 | 用途 |
+|------|------|
+| `user_index.php` | 個人資料頁（統計 + 記錄） |
+| `setting.php` | 帳號設定（名稱 / 信箱 / 密碼修改） |
 
-- **js/**：前端 JavaScript 檔案
-  - 包含：`app.js`、`jquery-3.7.1.min.js`、`datatables.min.js` 等
+### css/ — 樣式表
+| 檔案 | 用途 |
+|------|------|
+| `app.css` | 入口檔案（@import base, components, clubs） |
+| `base.css` | 變數、重設、排版、動畫、RWD |
+| `components.css` | 按鈕、面板、表單卡片、欄位、表格、操作群組 |
+| `clubs.css` | 社團管理頁面樣式 |
 
-- 根目錄重要檔案：
-  - `index.php`：首頁（專案入口）
-  - `login.php`、`logout.php`、`register.php`：認證相關頁面
-  - `group_41.sql`：資料表與初始資料（匯入到 MySQL）
+### js/ — 前端 JavaScript
+| 檔案 | 用途 |
+|------|------|
+| `app.js` | 表單建構器、驗證、確認對話框、提交防重複 |
+| `sweetalert2@11.js` | SweetAlert2（全局載入） |
+| `chart.umd.js` | Chart.js（僅 statistics.php 載入） |
 
-## 建議的分類原則（以保守、安全為主）
+### uploads/ — 上傳檔案
+| 檔案 | 用途 |
+|------|------|
+| `.htaccess` | 禁止直接存取（`Require all denied`） |
 
-1. 先備份：任何搬移/刪除動作前請先備份原始檔案
-2. 公開資源（CSS/JS/圖片）應集中於 `css/`、`js/`，並由網域根目錄或 `public/` 提供
-3. 後端頁面（PHP）可保留現有目錄結構以避免相對路徑中斷；若要大規模重構，請搭配自動化調整 (如修改 `includes/header.php` 的資源路徑)
-4. 歷史或不再使用的檔案建議移至 `archive/` 或 `archive/unused_by_readme/` 做紀錄，不直接刪除
+## 資料庫結構（14 張表）
+1. `users` — 使用者帳號
+2. `clubs` — 社團基本資料
+3. `club_memberships` — 社團成員關聯
+4. `forms` — 表單主表
+5. `form_questions` — 表單題目
+6. `question_options` — 選擇題選項
+7. `form_submissions` — 填寫記錄
+8. `answers` — 答案明細
+9. `remember_tokens` — 記住我 Token
+10. `password_resets` — 密碼重設
+11. `club_invitations` — 社團邀請
+12. `club_join_requests` — 加入申請
+13. `club_announcements` — 社團公告
+14. `club_activity_log` — 活動稽核日誌
 
-## 常用 PowerShell 範例（備份 / 移動 / 還原）
-
-以下指令在專案根目錄（本案為 `d:\xampp\htdocs\group_41`）執行：
-
-備份單一檔案：
-
-```powershell
-Copy-Item -Path "forms\save_form.php" -Destination "archive\save_form.php.bak"
-```
-
-將檔案移到 archive（示範，不會自動更新程式內引用）：
-
-```powershell
-Move-Item -Path "forms\save_form.php" -Destination "archive\unused_by_readme\save_form.php"
-```
-
-批次建立 archive 子資料夾並備份整個目錄（範例）：
-
-```powershell
-# 建立備份資料夾
-New-Item -ItemType Directory -Path "archive\classified_by_readme" -Force
-
-# 複製整個 forms 資料夾備份
-Copy-Item -Path "forms\*" -Destination "archive\classified_by_readme\forms_backup" -Recurse -Force
-```
-
-還原檔案（從備份恢復）：
-
-```powershell
-Move-Item -Path "archive\unused_by_readme\save_form.php" -Destination "forms\save_form.php"
-```
-
-注意：若執行 `Move-Item` 導致原始檔案路徑變動，專案中以相對路徑載入的 `require`、`include` 或前端資源路徑可能會中斷，需要同步修改引用。
-
-## 我已完成的工作與下一步
-
-- 我已整理並更新本 `readme.md`，說明各資料夾用途並加入建議分類與備份/還原指令。
-- 下一步我可以：
-  1.  依 README 建議幫你把「未使用或可移除的檔案」移到 `archive/`（預設會先備份）；或
-  2.  直接在專案中做完整重構（移動檔案並同時更新引用路徑）—此選項風險較高，會需要更多測試。
-
-請回覆你要我採取哪一個動作（`備份並移到 archive` 或 `直接重構並更新引用`），我就開始執行。
-
----
-
-檔案： [readme.md](readme.md)
+## 安全機制
+- CSRF 防護：所有 POST 表單需通過 `csrf_verify()`
+- 管理員授權：集中於 `includes/admin_auth.php`
+- 密碼雜湊：bcrypt（含 SHA256 舊密碼相容）
+- 記住我：Token-based（SHA256 hash），單一裝置
+- 檔案上傳：隨機檔名（32 位元 hex），`.htaccess` 禁止直接存取
+- SQL Injection：全站使用 Prepared Statements

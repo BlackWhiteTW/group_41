@@ -292,5 +292,5 @@ try {
     }
 
 } catch (Throwable $e) {
-    echo '錯誤：' . $e->getMessage();
+    echo '錯誤：' . htmlspecialchars($e->getMessage());
 }

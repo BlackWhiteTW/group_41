@@ -28,6 +28,8 @@ $all_sections = [
 			['label' => '管理後台', 'href' => 'admin_index.php', 'description' => '管理員首頁'],
 			['label' => '使用者管理', 'href' => 'user_CRUD.php', 'description' => '管理使用者'],
 			['label' => '表單管理', 'href' => 'forms_CRUD.php', 'description' => '管理所有表單'],
+			['label' => '社團管理', 'href' => 'clubs_CRUD.php', 'description' => '管理所有社團'],
+			['label' => '活動記錄', 'href' => 'activity_log.php', 'description' => '系統操作稽核日誌'],
 			['label' => 'SQL 檢視', 'href' => 'sql_view.php', 'description' => '資料庫結構'],
 			['label' => 'SQL 重置', 'href' => 'sql_reset.php', 'description' => '重新匯入 SQL'],
 			['label' => '簡易測試', 'href' => 'test.php', 'description' => '簡易測試頁面']
@@ -53,6 +55,11 @@ $section_key = end($dir_parts);
 // 允許頁面手動指定 $section 覆蓋自動偵測
 if (!isset($section) || !array_key_exists($section, $all_sections)) {
 	$section = isset($all_sections[$section_key]) ? $section_key : 'default';
+}
+
+// 若 section 仍無效（例如根層級頁面），不顯示側邊欄
+if (!isset($all_sections[$section])) {
+	return;
 }
 
 $section_config = $all_sections[$section];

@@ -81,12 +81,6 @@ $is_officer = $is_admin || !empty($managed_clubs);
 			<div class="container">
 				<h1>我的表單</h1>
 				<p class="muted">查看你建立的表單與目前狀態。</p>
-				<?php if (!empty($_SESSION['flash_success'])) : ?>
-					<div class="success"><?php echo htmlspecialchars($_SESSION['flash_success']); unset($_SESSION['flash_success']); ?></div>
-				<?php endif; ?>
-				<?php if (!empty($_SESSION['flash_error'])) : ?>
-					<div class="error"><?php echo htmlspecialchars($_SESSION['flash_error']); unset($_SESSION['flash_error']); ?></div>
-				<?php endif; ?>
 				<?php if (!empty($errors)) : ?>
 					<div class="error">
 						<ul>

@@ -100,6 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </main>
 
     <script src="./js/app.js"></script>
+    <footer class="footer container">社團表單系統</footer>
 </body>
 </html>
 <?php

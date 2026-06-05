@@ -9,7 +9,7 @@ if ($base_url !== '' && substr($base_url, -1) !== '/') {
 	$base_url .= '/';
 }
 
-// 檢查是否為管理員
+// 檢查是否為管理員 / 社團幹部（使用 cookies.php 中的輔助函數）
 $is_admin_user = false;
 $is_club_officer = false;
 if ($is_logged_in) {
@@ -35,74 +35,14 @@ if (!empty($_SESSION['flash_success'])) {
 	unset($_SESSION['flash_success']);
 }
 
-// 閒置超時（秒）: 3600 = 1 小時
-$idle_timeout = 3600;
-$session_expired = false;
-if (isset($_SESSION['last_activity'])) {
-	$inactive = time() - $_SESSION['last_activity'];
-	if ($inactive > $idle_timeout) {
-		// 若使用者有 remember cookie，延長 session 與 cookie 的存活期
-		if (isset($_COOKIE['remember_active']) && $_COOKIE['remember_active'] === '1') {
-			if (session_status() !== PHP_SESSION_ACTIVE) {
-				session_start();
-			}
-			session_regenerate_id(true);
-			$_SESSION['last_activity'] = time();
-			// 延長 remember cookie 和 session cookie
-			setcookie('remember_active', '1', time() + $idle_timeout, '/');
-			setcookie(session_name(), session_id(), time() + $idle_timeout, '/', '', false, true);
-		} else {
-			// 沒有 remember cookie，清除 session
-			session_unset();
-			session_destroy();
-			if (ini_get("session.use_cookies")) {
-				$params = session_get_cookie_params();
-				setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
-			} else {
-				setcookie(session_name(), '', time() - 3600, '/');
-			}
-			// 也清除 remember cookie（以防）
-			setcookie('remember_active', '', time() - 3600, '/');
-			$session_expired = true;
-			$user_raw = null;
-			$user = null;
-		}
-	}
-}
-
-if (!isset($session_expired) || $session_expired === false) {
-	// 更新最後活動時間
-	if (session_status() !== PHP_SESSION_ACTIVE) {
-		session_start();
-	}
-	$_SESSION['last_activity'] = time();
-}
+// 更新最後活動時間
+$_SESSION['last_activity'] = time();
 
 if (!isset($user_raw)) {
 	$user_raw = isset($_SESSION['user']) ? $_SESSION['user'] : null;
 }
 if (!isset($user)) {
 	$user = !empty($user_raw) ? htmlspecialchars($user_raw) : null;
-}
-
-$show_status = isset($show_status) ? (bool) $show_status : false;
-$base_url = isset($base_url) ? $base_url : './';
-if ($base_url !== '' && substr($base_url, -1) !== '/') {
-	$base_url .= '/';
-}
-
-// 檢查是否為管理員
-$is_admin_user = false;
-if (!empty($user_raw)) {
-	try {
-		$pdo_check = get_db();
-		$role_stmt = $pdo_check->prepare('SELECT role FROM users WHERE username = :u LIMIT 1');
-		$role_stmt->execute([':u' => $user_raw]);
-		$role_row = $role_stmt->fetch();
-		$is_admin_user = ($role_row && $role_row['role'] === 'admin');
-	} catch (Throwable $e) {
-		// ignore
-	}
 }
 ?>
 <header id="global-topbar" class="topbar" style="position: fixed; left: 0; right: 0; top: 0; z-index: 1000; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.06)">

@@ -2,6 +2,7 @@
 session_start();
 
 require '../includes/db.php';
+require '../includes/functions.php';
 
 $user = !empty($_SESSION['user']) ? htmlspecialchars($_SESSION['user']) : null;
 $current_user_raw = isset($_SESSION['user']) ? $_SESSION['user'] : null;
@@ -15,16 +16,6 @@ $form = null;
 $questions = [];
 $options_map = [];
 $load_error = null;
-
-function parse_target_clubs($value)
-{
-	if (!is_string($value) || trim($value) === '') {
-		return [];
-	}
-	$items = array_map('trim', explode(',', $value));
-	$items = array_values(array_filter($items, 'strlen'));
-	return array_values(array_unique(array_map('intval', $items)));
-}
 
 if ($form_id > 0) {
 	try {

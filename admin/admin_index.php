@@ -1,11 +1,6 @@
 <?php
-session_start();
+require __DIR__ . '/../includes/admin_auth.php';
 
-require '../includes/db.php';
-
-$user_raw = isset($_SESSION['user']) ? $_SESSION['user'] : null;
-$user = !empty($user_raw) ? htmlspecialchars($user_raw) : null;
-$current_user = null;
 $errors = [];
 $stats = [
     'users' => 0,
@@ -14,22 +9,7 @@ $stats = [
     'submissions' => 0
 ];
 
-    if (empty($user_raw)) {
-    header('Location: ../login.php');
-    exit();
-}
-
 try {
-    $pdo = get_db();
-    $u = $pdo->prepare('SELECT id, username, role FROM users WHERE username = :u LIMIT 1');
-    $u->execute([':u' => $user_raw]);
-    $current_user = $u->fetch();
-    if (!$current_user || $current_user['role'] !== 'admin') {
-        $_SESSION['flash_error'] = '需要管理員權限才能進入管理介面。';
-        header('Location: ../index.php');
-        exit();
-    }
-
     $stats['users'] = (int) $pdo->query('SELECT COUNT(*) FROM users')->fetchColumn();
     $stats['clubs'] = (int) $pdo->query('SELECT COUNT(*) FROM clubs')->fetchColumn();
     $stats['forms'] = (int) $pdo->query('SELECT COUNT(*) FROM forms')->fetchColumn();
@@ -53,7 +33,7 @@ try {
         <link rel="stylesheet" href="../css/app.css" />
     </head>
     <body>
-        <?php $base_url = '../'; require '../includes/header.php'; ?>
+        <?php $base_url = '../'; require __DIR__ . '/../includes/header.php'; ?>
 
         <main class="section">
             <div class="container" style="display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); align-items: start">
@@ -97,10 +77,13 @@ try {
                     <div class="panel" style="padding: 20px">
                         <h2 style="margin-top: 0">管理工具</h2>
                         <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px">
-                            <a class="btn btn-primary" href="./sql_view.php">SQL 資料檢視</a>
+                            <a class="btn btn-primary" href="./user_CRUD.php">使用者管理</a>
+                            <a class="btn btn-ghost" href="./forms_CRUD.php">表單管理</a>
+                            <a class="btn btn-ghost" href="./clubs_CRUD.php">社團管理</a>
+                            <a class="btn btn-ghost" href="./activity_log.php">活動記錄</a>
+                            <a class="btn btn-ghost" href="./sql_view.php">SQL 資料檢視</a>
                             <a class="btn btn-ghost" href="./sql_reset.php">重新匯入資料庫</a>
                             <a class="btn btn-ghost" href="./test.php">簡易測試</a>
-                            <a class="btn btn-ghost" href="./user_CRUD.php">使用者管理</a>
                         </div>
                         <p class="muted" style="margin-top: 12px">重新匯入資料庫將執行 group_41.sql，請確認後再使用。</p>
                     </div>

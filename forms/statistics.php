@@ -335,11 +335,7 @@ if ($csv && empty($errors)) {
 														$file_info = $answers[0];
 														$answer_text = htmlspecialchars($file_info['filename']);
 													} elseif (count($answers) === 1) {
-														if (strpos($answers[0], '<a ') === 0) {
-															$answer_text = $answers[0];
-														} else {
-															$answer_text = nl2br(htmlspecialchars($answers[0]));
-														}
+														$answer_text = nl2br(htmlspecialchars($answers[0]));
 													} else {
 														$clean_answers = array_map('htmlspecialchars', $answers);
 														$answer_text = implode('、', $clean_answers);

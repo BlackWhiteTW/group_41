@@ -1,88 +1,78 @@
 <?php
-// SQL 資料檢視頁面（管理區）：提供管理員查看資料庫內各資料表內容的介面
+require __DIR__ . '/../includes/admin_auth.php';
 
-session_start();
-require '../includes/db.php';
-
-$user_raw = isset($_SESSION['user']) ? $_SESSION['user'] : null;
-$user = !empty($user_raw) ? htmlspecialchars($user_raw) : null;
-$current_user = null;
 $errors = [];
 
-if (empty($user_raw)) {
-  header('Location: ../login.php');
-  exit();
-}
-
 $allowed_tables = [
-  'users',
-  'clubs',
-  'club_memberships',
-  'forms',
-  'form_questions',
-  'question_options',
-  'form_submissions',
-  'answers'
+    'users',
+    'clubs',
+    'club_memberships',
+    'forms',
+    'form_questions',
+    'question_options',
+    'form_submissions',
+    'answers',
+    'remember_tokens',
+    'password_resets',
+    'club_invitations',
+    'club_join_requests',
+    'club_announcements',
+    'club_activity_log'
 ];
 
 $table_descriptions = [
-  'users'              => '使用者帳號表 — 儲存所有使用者基本資料、系統層級角色，以及記住我 Token 雜湊（remember_token_hash）。',
-  'clubs'              => '社團基本資料表 — 每個社團由一位使用者建立，記錄名稱、簡介、加入模式與可見性。',
-  'club_memberships'   => '社團成員關聯表 — 使用者 ↔ 社團的多對多關係，記錄每位成員在社團中的角色。',
-  'forms'              => '表單主表 — 每張表單的標題、權限、狀態與開放時間，可掛在社團下或設為全域表單。',
-  'form_questions'     => '表單題目表 — 一張表單可包含多個題目，支援簡答、長答、單選、多選、檔案上傳。',
-  'question_options'   => '選擇題選項表 — 僅用於單選 / 多選題，每個選項屬於一道題目。',
-  'form_submissions'   => '表單填寫記錄表 — 每次提交產生一筆，記錄填答者與提交時間。',
-  'answers'            => '答案明細表 — 一筆提交中每題的具體答案，文字/選項/檔案路徑擇一存放。',
+    'users'              => '使用者帳號表 — 儲存所有使用者基本資料、系統層級角色，以及記住我 Token 雜湊（remember_token_hash）。',
+    'clubs'              => '社團基本資料表 — 每個社團由一位使用者建立，記錄名稱、簡介、加入模式與可見性。',
+    'club_memberships'   => '社團成員關聯表 — 使用者 ↔ 社團的多對多關係，記錄每位成員在社團中的角色。',
+    'forms'              => '表單主表 — 每張表單的標題、權限、狀態與開放時間，可掛在社團下或設為全域表單。',
+    'form_questions'     => '表單題目表 — 一張表單可包含多個題目，支援簡答、長答、單選、多選、檔案上傳。',
+    'question_options'   => '選擇題選項表 — 僅用於單選 / 多選題，每個選項屬於一道題目。',
+    'form_submissions'   => '表單填寫記錄表 — 每次提交產生一筆，記錄填答者與提交時間。',
+    'answers'            => '答案明細表 — 一筆提交中每題的具體答案，文字 / 選項 / 檔案路徑擇一存放。',
+    'remember_tokens'    => '記住我 Token 表 — 儲存使用者登入持久化 Token。',
+    'password_resets'    => '密碼重設表 — 忘記密碼流程中產生的重設 Token。',
+    'club_invitations'   => '社團邀請表 — 記錄社團邀請成員的狀態（待處理 / 已接受 / 已拒絕）。',
+    'club_join_requests' => '社團加入請求表 — 使用者主動申請加入社團的記錄。',
+    'club_announcements' => '社團公告表 — 各社團發布的公告內容。',
+    'club_activity_log'  => '社團活動記錄表 — 系統操作與社團活動的稽核日誌。',
 ];
 
 $selected = isset($_GET['table']) ? $_GET['table'] : $allowed_tables[0];
 if (!in_array($selected, $allowed_tables, true)) {
-  $selected = $allowed_tables[0];
+    $selected = $allowed_tables[0];
 }
 
 $counts      = [];
-$columns     = [];   // ['Field' => ..., 'Type' => ..., 'Comment' => ...]
+$columns     = [];
 $column_names = [];
 $rows        = [];
 $total_rows  = 0;
 $table_comment = '';
 
 try {
-  $pdo = get_db();
-  if ($user_raw) {
-    $u = $pdo->prepare('SELECT id, username, role FROM users WHERE username = :u LIMIT 1');
-    $u->execute([':u' => $user_raw]);
-    $current_user = $u->fetch();
-  }
+    foreach ($allowed_tables as $table) {
+        try {
+            $counts[$table] = (int) $pdo->query('SELECT COUNT(*) FROM `' . $table . '`')->fetchColumn();
+        } catch (Throwable $e) {
+            $counts[$table] = 0;
+        }
+    }
 
-  if (!$current_user || $current_user['role'] !== 'admin') {
-    $_SESSION['flash_error'] = '需要管理員權限才能瀏覽資料表。';
-    header('Location: ../index.php');
-    exit();
-  }
+    $col_info = $pdo->query('SHOW FULL COLUMNS FROM `' . $selected . '`')->fetchAll();
+    foreach ($col_info as $col) {
+        $columns[] = $col;
+        $column_names[] = $col['Field'];
+    }
 
-  foreach ($allowed_tables as $table) {
-    $counts[$table] = (int) $pdo->query('SELECT COUNT(*) FROM `' . $table . '`')->fetchColumn();
-  }
+    $tbl_status = $pdo->query("SHOW TABLE STATUS WHERE Name = '$selected'")->fetch();
+    $table_comment = $tbl_status['Comment'] ?? '';
 
-  // 取得完整欄位資訊（含 Comment）
-  $col_info = $pdo->query('SHOW FULL COLUMNS FROM `' . $selected . '`')->fetchAll();
-  foreach ($col_info as $col) {
-    $columns[] = $col;
-    $column_names[] = $col['Field'];
-  }
-
-  // 取得資料表註解
-  $tbl_status = $pdo->query("SHOW TABLE STATUS WHERE Name = '$selected'")->fetch();
-  $table_comment = $tbl_status['Comment'] ?? '';
-
-  $total_rows = isset($counts[$selected]) ? $counts[$selected] : 0;
-  $order_sql = in_array('id', $column_names, true) ? ' ORDER BY `id` DESC' : '';
-  $stmt = $pdo->query('SELECT * FROM `' . $selected . '`' . $order_sql . ' LIMIT 200');
-  $rows = $stmt->fetchAll();
+    $total_rows = isset($counts[$selected]) ? $counts[$selected] : 0;
+    $order_sql = in_array('id', $column_names, true) ? ' ORDER BY `id` DESC' : '';
+    $stmt = $pdo->query('SELECT * FROM `' . $selected . '`' . $order_sql . ' LIMIT 200');
+    $rows = $stmt->fetchAll();
 } catch (Throwable $e) {
-  $errors[] = '資料庫讀取失敗，請稍後再試。';
+    $errors[] = '資料庫讀取失敗，請稍後再試。';
 }
 ?>
 <!doctype html>
@@ -100,7 +90,7 @@ try {
     <link rel="stylesheet" href="../css/app.css" />
   </head>
   <body>
-    <?php $base_url = '../'; require '../includes/header.php'; ?>
+    <?php $base_url = '../'; require __DIR__ . '/../includes/header.php'; ?>
 
     <?php require __DIR__ . '/../includes/right.php'; ?>
 

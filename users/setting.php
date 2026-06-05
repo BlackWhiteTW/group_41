@@ -102,13 +102,11 @@ try {
 				$update_stmt->execute($updates);
 				$pdo->commit();
 
-				require_once __DIR__ . '/../includes/cookies.php';
 				update_user_session($form['username']);
 				$current_user['username'] = $form['username'];
 				$current_user['email'] = $form['email'];
 				$user = htmlspecialchars($form['username']);
 				$success_message = '個人資料已更新。';
-				$_SESSION['setting_csrf_token'] = bin2hex(random_bytes(32));
 			} catch (Throwable $e) {
 				if ($pdo->inTransaction()) {
 					$pdo->rollBack();
@@ -197,7 +195,7 @@ try {
 
 						<div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px">
 							<button class="btn btn-primary" type="submit">儲存修改</button>
-							<a class="btn btn-ghost" href="./index.php">取消</a>
+							<a class="btn btn-ghost" href="./user_index.php">取消</a>
 						</div>
 					</form>
 				</div>

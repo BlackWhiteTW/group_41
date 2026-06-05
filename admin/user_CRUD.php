@@ -1,12 +1,7 @@
 <?php
-require_once __DIR__ . '/../includes/cookies.php';
-
-require __DIR__ . '/../includes/db.php';
+require __DIR__ . '/../includes/admin_auth.php';
 require __DIR__ . '/../includes/csrf.php';
 
-$user_raw = isset($_SESSION['user']) ? $_SESSION['user'] : null;
-$user = !empty($user_raw) ? htmlspecialchars($user_raw) : null;
-$current_user = null;
 $errors = [];
 $search = isset($_GET['q']) ? trim($_GET['q']) : '';
 $selected_id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
@@ -41,21 +36,7 @@ $membership_labels = [
 $allowed_user_roles = ['member', 'owner', 'club_officer', 'admin'];
 $allowed_membership_roles = ['member', 'owner', 'club_officer'];
 
-if (empty($user_raw)) {
-	header('Location: ../login.php');
-	exit();
-}
-
 try {
-	$pdo = get_db();
-	$current_stmt = $pdo->prepare('SELECT id, username, role FROM users WHERE username = :u LIMIT 1');
-	$current_stmt->execute([':u' => $user_raw]);
-	$current_user = $current_stmt->fetch();
-	if (!$current_user || $current_user['role'] !== 'admin') {
-		$_SESSION['flash_error'] = '需要管理員權限才能進入使用者管理。';
-		header('Location: ../index.php');
-		exit();
-	}
 
 	$clubs = $pdo->query('SELECT id, name FROM clubs ORDER BY name ASC')->fetchAll();
 
@@ -365,14 +346,6 @@ try {
 		}
 	}
 
-	if (!isset($_SESSION['user_crud_token'])) {
-		$_SESSION['user_crud_token'] = bin2hex(random_bytes(32));
-	}
-
-	if (!empty($_SESSION['user_crud_token'])) {
-		$_SESSION['user_crud_token'] = bin2hex(random_bytes(32));
-	}
-
 	$user_query = 'SELECT u.id, u.username, u.email, u.role, u.created_at, COUNT(m.id) AS club_count FROM users u LEFT JOIN club_memberships m ON m.user_id = u.id';
 	$params = [];
 	if ($search !== '') {
@@ -405,14 +378,14 @@ try {
 			$membership_stmt = $pdo->prepare('SELECT m.id, m.role, c.id AS club_id, c.name AS club_name FROM club_memberships m JOIN clubs c ON c.id = m.club_id WHERE m.user_id = :id ORDER BY c.name ASC');
 			$membership_stmt->execute([':id' => $selected_id]);
 			$memberships = $membership_stmt->fetchAll();
-		foreach ($memberships as $membership) {
-			$membership_map[(int) $membership['club_id']] = true;
-		}
+			foreach ($memberships as $membership) {
+				$membership_map[(int) $membership['club_id']] = true;
+			}
 
-		$form_count_stmt = $pdo->prepare('SELECT COUNT(*) FROM forms WHERE creator_id = :id');
-		$form_count_stmt->execute([':id' => $selected_id]);
-		$form_count = (int) $form_count_stmt->fetchColumn();
-	}
+			$form_count_stmt = $pdo->prepare('SELECT COUNT(*) FROM forms WHERE creator_id = :id');
+			$form_count_stmt->execute([':id' => $selected_id]);
+			$form_count = (int) $form_count_stmt->fetchColumn();
+		}
 	}
 } catch (Throwable $e) {
 	$errors[] = '使用者管理頁載入失敗，請稍後再試。';

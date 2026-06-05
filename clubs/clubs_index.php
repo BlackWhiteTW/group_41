@@ -2,6 +2,7 @@
 session_start();
 
 require __DIR__ . '/../includes/db.php';
+require __DIR__ . '/../includes/csrf.php';
 
 $user_raw = isset($_SESSION['user']) ? $_SESSION['user'] : null;
 $user = !empty($user_raw) ? htmlspecialchars($user_raw) : null;

@@ -3,6 +3,7 @@ session_start();
 
 require '../includes/db.php';
 require '../includes/csrf.php';
+require '../includes/functions.php';
 
 $user_raw = isset($_SESSION['user']) ? $_SESSION['user'] : null;
 $user = !empty($user_raw) ? htmlspecialchars($user_raw) : null;
@@ -15,16 +16,6 @@ $errors = [];
 $success = '';
 
 $edit_id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
-
-function parse_target_clubs($value)
-{
-	if (!is_string($value) || trim($value) === '') {
-		return [];
-	}
-	$items = array_map('trim', explode(',', $value));
-	$items = array_values(array_filter($items, 'strlen'));
-	return array_values(array_unique(array_map('intval', $items)));
-}
 
 if (!$user_raw) {
 	header('Location: ../login.php');
@@ -311,12 +302,6 @@ $allowed_types = ['short_answer', 'long_answer', 'multiple_choice', 'multi_choic
 
 	<main class="section">
 		<div class="container">
-			<?php if (!empty($_SESSION['flash_success'])) : ?>
-				<div class="success"><?php echo htmlspecialchars($_SESSION['flash_success']); unset($_SESSION['flash_success']); ?></div>
-			<?php endif; ?>
-			<?php if (!empty($_SESSION['flash_error'])) : ?>
-				<div class="error"><?php echo htmlspecialchars($_SESSION['flash_error']); unset($_SESSION['flash_error']); ?></div>
-			<?php endif; ?>
 			<?php if (!empty($errors)) : ?>
 				<div class="error"><ul><?php foreach ($errors as $e) : ?><li><?php echo htmlspecialchars($e); ?></li><?php endforeach; ?></ul></div>
 			<?php endif; ?>

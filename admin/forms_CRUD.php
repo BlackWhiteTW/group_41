@@ -1,12 +1,7 @@
 <?php
-require_once __DIR__ . '/../includes/cookies.php';
-
-require __DIR__ . '/../includes/db.php';
+require __DIR__ . '/../includes/admin_auth.php';
 require __DIR__ . '/../includes/csrf.php';
 
-$user_raw = isset($_SESSION['user']) ? $_SESSION['user'] : null;
-$user = !empty($user_raw) ? htmlspecialchars($user_raw) : null;
-$current_user = null;
 $errors = [];
 $success = '';
 $search = isset($_GET['q']) ? trim($_GET['q']) : '';
@@ -16,21 +11,7 @@ $forms_list = [];
 $type_labels = ['public' => '公開表單', 'club_only' => '限定社團'];
 $status_labels = ['draft' => '草稿', 'published' => '已發布', 'closed' => '已關閉'];
 
-if (empty($user_raw)) {
-	header('Location: ../login.php');
-	exit();
-}
-
 try {
-	$pdo = get_db();
-	$current_stmt = $pdo->prepare('SELECT id, username, role FROM users WHERE username = :u LIMIT 1');
-	$current_stmt->execute([':u' => $user_raw]);
-	$current_user = $current_stmt->fetch();
-	if (!$current_user || $current_user['role'] !== 'admin') {
-		$_SESSION['flash_error'] = '需要管理員權限才能進入表單管理。';
-		header('Location: ../index.php');
-		exit();
-	}
 
 	if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		$posted_action = isset($_POST['action']) ? $_POST['action'] : '';
@@ -61,7 +42,9 @@ try {
 						}
 
 						$pdo->prepare('DELETE FROM forms WHERE id = :id')->execute([':id' => $delete_id]);
-						$success = '表單「' . $delete_form['title'] . '」已刪除。';
+						$_SESSION['flash_success'] = '表單「' . $delete_form['title'] . '」已刪除。';
+						header('Location: ./forms_CRUD.php' . ($search !== '' || $status_filter !== '' ? '?' . ($search !== '' ? 'q=' . urlencode($search) : '') . ($search !== '' && $status_filter !== '' ? '&' : '') . ($status_filter !== '' ? 'status=' . urlencode($status_filter) : '') : ''));
+						exit();
 					} catch (Throwable $e) {
 						$errors[] = '刪除表單失敗，請稍後再試。';
 					}
@@ -78,7 +61,9 @@ try {
 				try {
 					$upd = $pdo->prepare('UPDATE forms SET status = :s WHERE id = :id');
 					$upd->execute([':s' => $new_status, ':id' => $update_id]);
-					$success = '表單狀態已更新。';
+					$_SESSION['flash_success'] = '表單狀態已更新。';
+					header('Location: ./forms_CRUD.php' . ($search !== '' || $status_filter !== '' ? '?' . ($search !== '' ? 'q=' . urlencode($search) : '') . ($search !== '' && $status_filter !== '' ? '&' : '') . ($status_filter !== '' ? 'status=' . urlencode($status_filter) : '') : ''));
+					exit();
 				} catch (Throwable $e) {
 					$errors[] = '更新表單狀態失敗。';
 				}

@@ -107,7 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit();
         } catch (PDOException $e) {
             $pdo->rollBack();
-            $errors[] = '註冊失敗：' . $e->getMessage();
+            $errors[] = '註冊失敗，請稍後再試。';
         }
     }
     }
@@ -203,6 +203,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </main>
 
         <script src="./js/app.js"></script>
+        <footer class="footer container">社團表單系統</footer>
     </body>
 </html>
 
