@@ -56,8 +56,8 @@ try {
         exit('權限不足');
     }
 
-    $file = __DIR__ . '/../uploads/' . $row['file_path'];
-    if (!file_exists($file)) {
+    $file = __DIR__ . '/../uploads/' . basename($row['file_path']);
+    if (!file_exists($file) || !is_file($file)) {
         http_response_code(404);
         exit('檔案不存在');
     }
@@ -95,7 +95,7 @@ try {
     if ($preview) {
         header('Content-Disposition: inline');
     } else {
-        $safe_name = str_replace('"', '', $original_name);
+        $safe_name = str_replace(['"', "\r", "\n"], '', $original_name);
         header('Content-Disposition: attachment; filename="' . $safe_name . '"');
     }
     header('Content-Length: ' . filesize($file));

@@ -10,7 +10,7 @@ $club_options = array_column($pdo->query('SELECT name FROM clubs ORDER BY name A
 
 $errors = [];
 $success = false;
-$club_mode = 'existing';
+$club_mode = 'none';
 $existing_club = '';
 $new_club_name = '';
 
@@ -31,16 +31,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (strlen($password) < 6) $errors[] = '密碼至少 6 個字元';
     if ($password !== $password_confirm) $errors[] = '密碼與確認密碼不相符';
 
-    if (!in_array($club_mode, ['existing', 'new'], true)) {
-        $club_mode = 'existing';
+    if (!in_array($club_mode, ['none', 'existing', 'new'], true)) {
+        $club_mode = 'none';
     }
     if ($club_mode === 'existing') {
         if (empty($club_options)) {
-            $errors[] = '目前尚無社團，請選擇建立新社團。';
+            $errors[] = '目前尚無社團，請選擇不加入社團或建立新社團。';
         } elseif ($existing_club === '' || !in_array($existing_club, $club_options, true)) {
             $errors[] = '請選擇有效的社團。';
         }
-    } else {
+    } elseif ($club_mode === 'new') {
         if ($new_club_name === '') {
             $errors[] = '請輸入新社團名稱。';
         }
@@ -84,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ':c' => $club_id,
                     ':r' => 'club_officer'
                 ]);
-            } else {
+            } elseif ($club_mode === 'existing' && $existing_club) {
                 $club_stmt = $pdo->prepare('SELECT id FROM clubs WHERE name = :n LIMIT 1');
                 $club_stmt->execute([':n' => $existing_club]);
                 $club_row = $club_stmt->fetch();
@@ -162,13 +162,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     <div class="field">
                         <label>社團設定</label>
+                        <label><input type="radio" id="club_mode_none" name="club_mode" value="none" <?php echo $club_mode === 'none' ? 'checked' : ''; ?> /> 暫不加入社團</label>
                         <label><input type="radio" id="club_mode_existing" name="club_mode" value="existing" <?php echo $club_mode === 'existing' ? 'checked' : ''; ?> /> 加入既有社團</label>
                         <label><input type="radio" id="club_mode_new" name="club_mode" value="new" <?php echo $club_mode === 'new' ? 'checked' : ''; ?> /> 建立新社團</label>
                     </div>
 
-                    <div class="field" id="existingClubWrap" style="<?php echo $club_mode === 'new' ? 'display:none' : ''; ?>">
+                    <div class="field" id="existingClubWrap" style="<?php echo $club_mode === 'existing' ? '' : 'display:none'; ?>">
                         <label for="existing_club">選擇社團</label>
-                        <select id="existing_club" name="existing_club" <?php echo empty($club_options) ? 'disabled' : 'required'; ?>>
+                        <select id="existing_club" name="existing_club"<?php echo empty($club_options) ? ' disabled' : ''; ?>>
                             <?php if (empty($club_options)) : ?>
                                 <option value="">尚無社團，請建立新社團</option>
                             <?php else : ?>
@@ -202,7 +203,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </section>
         </main>
 
-        <script src="./js/app.js"></script>
+        <script src="./js/app.js?v=2"></script>
         <footer class="footer container">社團表單系統</footer>
     </body>
 </html>

@@ -93,12 +93,18 @@ try {
     elseif ($action === 'update_form_status') {
         $form_id = (int)$_POST['form_id'];
         $new_status = $_POST['status'];
+        if (!in_array($new_status, ['draft', 'published', 'closed'], true)) {
+            $new_status = 'draft';
+        }
         $stmt = $pdo->prepare('UPDATE forms SET status = :status WHERE id = :form_id AND club_id = :club_id');
         $stmt->execute([':status' => $new_status, ':form_id' => $form_id, ':club_id' => $club_id]);
     }
     elseif ($action === 'update_form_type') {
         $form_id = (int)$_POST['form_id'];
         $new_type = $_POST['form_type'];
+        if (!in_array($new_type, ['public', 'club_only'], true)) {
+            $new_type = 'public';
+        }
         $stmt = $pdo->prepare('UPDATE forms SET form_type = :form_type WHERE id = :form_id AND club_id = :club_id');
         $stmt->execute([':form_type' => $new_type, ':form_id' => $form_id, ':club_id' => $club_id]);
     }
@@ -111,7 +117,7 @@ try {
             $inv->execute([':u' => $invite_username]);
             $target = $inv->fetch();
             if (!$target) {
-                $_SESSION['flash_error'] = '找不到使用者：' . htmlspecialchars($invite_username);
+                $_SESSION['flash_error'] = '找不到使用者：' . $invite_username;
             } else {
                 $exist = $pdo->prepare('SELECT id FROM club_memberships WHERE club_id = :c AND user_id = :u');
                 $exist->execute([':c' => $club_id, ':u' => $target['id']]);
@@ -120,7 +126,7 @@ try {
                 } else {
                     $ins = $pdo->prepare('INSERT INTO club_invitations (club_id, user_id, invited_by) VALUES (:c, :u, :b)');
                     $ins->execute([':c' => $club_id, ':u' => $target['id'], ':b' => $current_user['id']]);
-                    $_SESSION['flash_success'] = '已邀請 ' . htmlspecialchars($invite_username) . ' 加入社團。';
+                    $_SESSION['flash_success'] = '已邀請 ' . $invite_username . ' 加入社團。';
                     log_activity($pdo, $club_id, $current_user['id'], 'invite_member', '邀請 ' . $invite_username);
                 }
             }
@@ -196,8 +202,8 @@ try {
     }
     elseif ($action === 'approve_request') {
         $req_id = (int)$_POST['request_id'];
-        $req = $pdo->prepare('SELECT * FROM club_join_requests WHERE id = :id AND status = "pending"');
-        $req->execute([':id' => $req_id]);
+        $req = $pdo->prepare('SELECT * FROM club_join_requests WHERE id = :id AND club_id = :club_id AND status = "pending"');
+        $req->execute([':id' => $req_id, ':club_id' => $club_id]);
         $request = $req->fetch();
         if ($request) {
             $pdo->beginTransaction();
@@ -213,10 +219,10 @@ try {
     }
     elseif ($action === 'reject_request') {
         $req_id = (int)$_POST['request_id'];
-        $req = $pdo->prepare('SELECT cr.id, u.username FROM club_join_requests cr JOIN users u ON u.id = cr.user_id WHERE cr.id = :id AND cr.status = "pending"');
-        $req->execute([':id' => $req_id]);
+        $req = $pdo->prepare('SELECT cr.id, u.username FROM club_join_requests cr JOIN users u ON u.id = cr.user_id WHERE cr.id = :id AND cr.club_id = :club_id AND cr.status = "pending"');
+        $req->execute([':id' => $req_id, ':club_id' => $club_id]);
         $request = $req->fetch();
-        $pdo->prepare('UPDATE club_join_requests SET status = "rejected" WHERE id = :id AND status = "pending"')->execute([':id' => $req_id]);
+        $pdo->prepare('UPDATE club_join_requests SET status = "rejected" WHERE id = :id AND club_id = :club_id AND status = "pending"')->execute([':id' => $req_id, ':club_id' => $club_id]);
         $_SESSION['flash_success'] = '已拒絕申請。';
         if ($request) {
             log_activity($pdo, $club_id, $current_user['id'], 'reject_request', '拒絕 ' . $request['username'] . ' 的加入申請');
@@ -292,5 +298,10 @@ try {
     }
 
 } catch (Throwable $e) {
-    echo '錯誤：' . htmlspecialchars($e->getMessage());
+    $_SESSION['flash_error'] = '操作失敗，請稍後再試。';
+    if (in_array($action, $public_actions, true)) {
+        header('Location: clubs_index.php');
+    } else {
+        header('Location: setting.php?id=' . $club_id);
+    }
 }

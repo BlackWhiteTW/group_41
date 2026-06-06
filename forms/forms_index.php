@@ -1,5 +1,5 @@
 <?php
-session_start();
+require __DIR__ . '/../includes/cookies.php';
 
 require __DIR__ . '/../includes/db.php';
 

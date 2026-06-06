@@ -2,12 +2,14 @@
 require_once './includes/cookies.php';
 require_once './includes/csrf.php';
 require './includes/db.php';
+require './includes/mail.php';
 
 $user = !empty($_SESSION['user']) ? htmlspecialchars($_SESSION['user']) : null;
 $errors = [];
 $message = '';
 $sent = false;
 $reset_link = '';
+$demo_mail_body = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_verify($_POST['csrf_token'] ?? '')) {
@@ -26,22 +28,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if ($user_row) {
                 $token = bin2hex(random_bytes(32));
-                $expires_at = date('Y-m-d H:i:s', strtotime('+1 hour'));
 
-                $ins = $pdo->prepare('INSERT INTO password_resets (email, token, expires_at) VALUES (:e, :t, :x)');
+                $ins = $pdo->prepare('INSERT INTO password_resets (email, token, expires_at) VALUES (:e, :t, DATE_ADD(NOW(), INTERVAL 1 HOUR))');
                 $ins->execute([
                     ':e' => $email,
-                    ':t' => $token,
-                    ':x' => $expires_at
+                    ':t' => $token
                 ]);
 
                 $reset_link = './reset_password.php?token=' . $token;
-                $sent = true;
+
+                $reset_url = (isset($_SERVER['HTTPS']) ? 'https://' : 'http://')
+                    . ($_SERVER['HTTP_HOST'] ?? 'localhost')
+                    . dirname($_SERVER['SCRIPT_NAME'])
+                    . '/reset_password.php?token=' . $token;
+
+                $demo_mail_body = build_reset_email_body($user_row['username'], $reset_url);
                 $message = '重設密碼連結已產生。';
             } else {
-                $message = '若此電子郵件存在於系統中，重設連結已產生。';
-                $sent = true;
+                $message = '找不到此電子郵件對應的帳號。';
             }
+
+            $sent = true;
         }
     }
 }
@@ -80,10 +87,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="panel" style="padding:20px;margin-top:12px;border-color:#8bc9b4;background:#eef7f3">
                     <p><?php echo htmlspecialchars($message); ?></p>
                     <?php if ($reset_link): ?>
-                        <p class="muted" style="word-break:break-all">
+                        <p class="muted" style="word-break:break-all;margin-top:8px">
                             <a href="<?php echo htmlspecialchars($reset_link); ?>"><?php echo htmlspecialchars($reset_link); ?></a>
                         </p>
-                        <p class="muted" style="font-size:0.85rem;margin-top:8px">連結有效期 1 小時。在實際環境中，此連結將透過電子郵件寄送。</p>
+                        <p class="muted" style="font-size:0.85rem;margin-top:4px">連結有效期 1 小時</p>
+                    <?php endif; ?>
+                    <?php if ($demo_mail_body): ?>
+                        <details style="margin-top:16px">
+                            <summary style="cursor:pointer;color:#6b7a72;font-size:0.9rem">📧 示範：正式環境將寄送的郵件內容</summary>
+                            <div style="margin-top:12px;padding:16px;background:#fff;border:1px dashed #ccc;border-radius:8px;font-size:0.85rem">
+                                <?php echo $demo_mail_body; ?>
+                            </div>
+                        </details>
                     <?php endif; ?>
                 </div>
             <?php else: ?>

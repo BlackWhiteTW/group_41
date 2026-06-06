@@ -133,3 +133,61 @@
     width: 100%;
   }
 }
+
+/* ── Manage Page Layout ── */
+.manage-layout {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: minmax(220px, 1fr) minmax(0, 3fr);
+}
+
+.club-list-grid {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.club-list-item {
+  padding: 12px;
+}
+
+@media (max-width: 768px) {
+  .manage-layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .club-list-panel {
+    padding: 12px !important;
+  }
+
+  .club-list-panel h3 {
+    margin: 0 0 8px 0;
+    font-size: 0.95rem;
+  }
+
+  .club-list-grid {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .club-list-item {
+    flex: 0 0 auto;
+    min-width: 140px;
+    max-width: 180px;
+    padding: 10px !important;
+  }
+
+  .club-list-item strong {
+    font-size: 0.9rem;
+  }
+
+  .club-list-item p.muted {
+    font-size: 0.75rem;
+    margin-top: 2px !important;
+  }
+}

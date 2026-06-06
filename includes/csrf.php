@@ -13,7 +13,11 @@ function csrf_verify($token)
     if (!isset($_SESSION['csrf_token']) || !is_string($token) || $token === '') {
         return false;
     }
-    return hash_equals($_SESSION['csrf_token'], $token);
+    $valid = hash_equals($_SESSION['csrf_token'], $token);
+    if ($valid) {
+        unset($_SESSION['csrf_token']);
+    }
+    return $valid;
 }
 
 function csrf_field()

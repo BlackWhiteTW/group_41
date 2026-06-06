@@ -145,16 +145,16 @@ $join_mode_labels = [
                         </div>
                     <?php endif; ?>
                 <?php else : ?>
-                    <div style="display: grid; gap: 20px; grid-template-columns: minmax(220px, 1fr) minmax(0, 3fr)">
-                        <div class="panel" style="padding: 16px">
+                    <div class="manage-layout">
+                        <div class="panel club-list-panel" style="padding: 16px">
                             <h3>社團清單</h3>
-                            <div style="display: grid; gap: 10px; margin-top: 12px">
+                            <div class="club-list-grid">
                                 <?php foreach ($clubs as $item) : ?>
                                     <?php $active = ($club && $club['id'] == $item['id']); ?>
                                     <a
                                         href="./manage.php?id=<?php echo (int) $item['id']; ?>"
-                                        class="panel"
-                                        style="padding: 12px; border-color: <?php echo $active ? '#8bc9b4' : '#e0e9e3'; ?>; background: <?php echo $active ? '#eef7f3' : 'rgba(255,255,255,0.9)'; ?>"
+                                        class="panel club-list-item"
+                                        style="border-color: <?php echo $active ? '#8bc9b4' : '#e0e9e3'; ?>; background: <?php echo $active ? '#eef7f3' : 'rgba(255,255,255,0.9)'; ?>"
                                     >
                                         <strong><?php echo htmlspecialchars($item['name']); ?></strong>
                                         <p class="muted" style="margin-top: 4px">擁有人：<?php echo htmlspecialchars($item['owner_name']); ?></p>
@@ -167,7 +167,7 @@ $join_mode_labels = [
                             <div class="panel" style="padding: 20px">
                                 <h2><?php echo htmlspecialchars($club['name']); ?></h2>
                                 <?php if (!empty($club['description'])): ?>
-                                    <p style="margin:8px 0"><?php echo nl2br(htmlspecialchars(wordwrap($club['description'], 20, "\n", true))); ?></p>
+                                    <p style="margin:8px 0;word-break:break-word;overflow-wrap:break-word"><?php echo nl2br(htmlspecialchars($club['description'])); ?></p>
                                 <?php endif; ?>
                                 <p class="meta">擁有人：<?php echo htmlspecialchars($club['owner_name']); ?><?php echo $club['owner_email'] ? ' ・ ' . htmlspecialchars($club['owner_email']) : ''; ?></p>
                                 <div style="display: flex; gap: 16px; flex-wrap: wrap; margin-top: 12px">

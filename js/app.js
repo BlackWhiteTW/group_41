@@ -2,16 +2,19 @@
 document.addEventListener('DOMContentLoaded', function(){
   var existingRadio = document.getElementById('club_mode_existing');
   var newRadio = document.getElementById('club_mode_new');
+  var noneRadio = document.getElementById('club_mode_none');
   var existingWrap = document.getElementById('existingClubWrap');
   var newWrap = document.getElementById('newClubWrap');
   if (existingRadio && newRadio && existingWrap && newWrap) {
     var syncClubMode = function(){
       var useExisting = existingRadio.checked;
+      var useNew = newRadio.checked;
       existingWrap.style.display = useExisting ? 'block' : 'none';
-      newWrap.style.display = useExisting ? 'none' : 'block';
+      newWrap.style.display = useNew ? 'block' : 'none';
     };
     existingRadio.addEventListener('change', syncClubMode);
     newRadio.addEventListener('change', syncClubMode);
+    if (noneRadio) noneRadio.addEventListener('change', syncClubMode);
     syncClubMode();
   }
 
@@ -278,6 +281,7 @@ document.addEventListener('DOMContentLoaded', function(){
   var forms = document.querySelectorAll('form[method="post"]');
   for (var i = 0; i < forms.length; i++) {
     forms[i].addEventListener('submit', function(e) {
+      if (this.id === 'registerForm' || this.id === 'submitForm') return;
       var btn = this.querySelector('button[type="submit"], input[type="submit"]');
       if (!btn) return;
       if (btn.dataset.originalText === undefined) {
@@ -335,6 +339,75 @@ document.addEventListener('DOMContentLoaded', function(){
         }
         return;
       }
+    });
+  }
+
+  var registerForm = document.getElementById('registerForm');
+  if (registerForm) {
+    registerForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      var btn = this.querySelector('button[type="submit"]');
+      var username = (document.getElementById('reg_username') || {}).value || '';
+      var email = (document.getElementById('reg_email') || {}).value || '';
+      var password = (document.getElementById('reg_password') || {}).value || '';
+      var passwordConfirm = (document.getElementById('reg_password_confirm') || {}).value || '';
+      var errors = [];
+
+      if (username.trim().length < 3) {
+        errors.push('帳號至少需要 3 個字元');
+      }
+
+      var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email.trim())) {
+        errors.push('請輸入有效的電子郵件');
+      }
+
+      if (password.length < 6) {
+        errors.push('密碼至少需要 6 個字元');
+      }
+
+      if (password !== passwordConfirm) {
+        errors.push('密碼與確認密碼不相符');
+      }
+
+      var clubMode = document.querySelector('input[name="club_mode"]:checked');
+      if (clubMode && clubMode.value === 'existing') {
+        var existingClub = (document.getElementById('existing_club') || {}).value || '';
+        if (!existingClub) {
+          errors.push('請選擇一個社團');
+        }
+      } else if (clubMode && clubMode.value === 'new') {
+        var newClubName = (document.getElementById('new_club_name') || {}).value || '';
+        if (newClubName.trim() === '') {
+          errors.push('請輸入新社團名稱');
+        }
+      }
+
+      if (errors.length > 0) {
+        if (typeof Swal !== 'undefined') {
+          Swal.fire({
+            title: '驗證失敗',
+            html: errors.map(function(m){ return '&bull; ' + m; }).join('<br>'),
+            icon: 'error',
+            confirmButtonText: '確定'
+          });
+        } else {
+          alert(errors.join('\n'));
+        }
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = btn.dataset.originalText || '註冊';
+        }
+        return;
+      }
+      if (btn) {
+        btn.disabled = true;
+        if (btn.dataset.originalText === undefined) {
+          btn.dataset.originalText = btn.textContent || '註冊';
+        }
+        btn.textContent = '註冊中...';
+      }
+      this.submit();
     });
   }
 });

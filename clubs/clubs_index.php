@@ -1,5 +1,5 @@
 <?php
-session_start();
+require __DIR__ . '/../includes/cookies.php';
 
 require __DIR__ . '/../includes/db.php';
 require __DIR__ . '/../includes/csrf.php';
@@ -221,6 +221,7 @@ $visibility_labels = [
                         <?php endif; ?>
                     <?php endif; ?>
                 </div>
+            </div>
             </div>
         </main>
 

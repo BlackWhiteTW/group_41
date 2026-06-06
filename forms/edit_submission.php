@@ -3,12 +3,12 @@ session_start();
 
 require '../includes/db.php';
 require '../includes/csrf.php';
+require '../includes/functions.php';
 
 $user_raw = isset($_SESSION['user']) ? $_SESSION['user'] : null;
 $user = !empty($user_raw) ? htmlspecialchars($user_raw) : null;
 $current_user = null;
 $errors = [];
-$success = '';
 $submission_id = isset($_GET['sid']) ? (int) $_GET['sid'] : 0;
 $submission = null;
 $form = null;
@@ -23,7 +23,7 @@ if (!$user_raw) {
 }
 
 if ($submission_id <= 0) {
-    header('Location: ./list.php');
+    header('Location: ./my_forms.php');
     exit();
 }
 
@@ -124,8 +124,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $form && empty($errors)) {
                             $errors[] = '題目「' . $q['question_text'] . '」的選項無效。';
                             break;
                         }
+                    }
                 }
-            }
             } elseif ($type === 'file_upload') {
                 $file = isset($_FILES['files']['name'][$qid]) ? $_FILES['files']['name'][$qid] : '';
                 if (!empty($file)) {
@@ -136,70 +136,72 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $form && empty($errors)) {
                         $errors[] = '題目「' . $q['question_text'] . '」檔案上傳失敗。';
                     } elseif ($size > 5 * 1024 * 1024) {
                         $errors[] = '題目「' . $q['question_text'] . '」檔案不可超過 5 MB。';
+                    } elseif (!is_allowed_upload_extension($file)) {
+                        $errors[] = '題目「' . $q['question_text'] . '」不支援此檔案類型，僅允許圖片、PDF、文件檔。';
+                    } elseif (!validate_upload_content($tmp, $file)) {
+                        $errors[] = '題目「' . $q['question_text'] . '」檔案內容驗證失敗，可能為偽造檔案。';
                     }
                 }
             }
         }
-    }
-    }
 
-    if (empty($errors)) {
-        try {
-            $pdo = get_db();
-            $pdo->beginTransaction();
+        if (empty($errors)) {
+            try {
+                $pdo = get_db();
+                $pdo->beginTransaction();
 
-            $del = $pdo->prepare('DELETE FROM answers WHERE submission_id = :sid');
-            $del->execute([':sid' => $submission_id]);
+                $del = $pdo->prepare('DELETE FROM answers WHERE submission_id = :sid');
+                $del->execute([':sid' => $submission_id]);
 
-            $ins = $pdo->prepare('INSERT INTO answers (submission_id, question_id, answer_text, option_id, file_path) VALUES (:s, :q, :t, :o, :fp)');
-            foreach ($questions as $q) {
-                $qid = $q['id'];
-                $type = $q['question_type'];
-                $value = isset($answers[$qid]) ? $answers[$qid] : null;
+                $ins = $pdo->prepare('INSERT INTO answers (submission_id, question_id, answer_text, option_id, file_path) VALUES (:s, :q, :t, :o, :fp)');
+                foreach ($questions as $q) {
+                    $qid = $q['id'];
+                    $type = $q['question_type'];
+                    $value = isset($answers[$qid]) ? $answers[$qid] : null;
 
-                if (in_array($type, ['short_answer', 'long_answer'], true)) {
-                    $text = is_string($value) ? trim($value) : '';
-                    if ($text !== '') {
-                        $ins->execute([':s' => $submission_id, ':q' => $qid, ':t' => $text, ':o' => null, ':fp' => null]);
-                    }
-                } elseif ($type === 'multiple_choice') {
-                    $option_id = (int) $value;
-                    if ($option_id) {
-                        $ins->execute([':s' => $submission_id, ':q' => $qid, ':t' => null, ':o' => $option_id, ':fp' => null]);
-                    }
-                } elseif ($type === 'multi_choice') {
-                    $option_ids = is_array($value) ? $value : [];
-                    foreach ($option_ids as $oid) {
-                        if ((int) $oid) {
-                            $ins->execute([':s' => $submission_id, ':q' => $qid, ':t' => null, ':o' => (int) $oid, ':fp' => null]);
+                    if (in_array($type, ['short_answer', 'long_answer'], true)) {
+                        $text = is_string($value) ? trim($value) : '';
+                        if ($text !== '') {
+                            $ins->execute([':s' => $submission_id, ':q' => $qid, ':t' => $text, ':o' => null, ':fp' => null]);
                         }
-                    }
-                } elseif ($type === 'file_upload') {
-                    $file_name = isset($_FILES['files']['name'][$qid]) ? $_FILES['files']['name'][$qid] : '';
-                    if (!empty($file_name) && $_FILES['files']['error'][$qid] === UPLOAD_ERR_OK) {
-                        $ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
-                        $stored_name = $submission_id . '_' . $qid . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
-                        $dest = __DIR__ . '/../uploads/' . $stored_name;
-                        if (move_uploaded_file($_FILES['files']['tmp_name'][$qid], $dest)) {
-                            $ins->execute([':s' => $submission_id, ':q' => $qid, ':t' => $file_name, ':o' => null, ':fp' => $stored_name]);
+                    } elseif ($type === 'multiple_choice') {
+                        $option_id = (int) $value;
+                        if ($option_id) {
+                            $ins->execute([':s' => $submission_id, ':q' => $qid, ':t' => null, ':o' => $option_id, ':fp' => null]);
+                        }
+                    } elseif ($type === 'multi_choice') {
+                        $option_ids = is_array($value) ? $value : [];
+                        foreach ($option_ids as $oid) {
+                            if ((int) $oid) {
+                                $ins->execute([':s' => $submission_id, ':q' => $qid, ':t' => null, ':o' => (int) $oid, ':fp' => null]);
+                            }
+                        }
+                    } elseif ($type === 'file_upload') {
+                        $file_name = isset($_FILES['files']['name'][$qid]) ? $_FILES['files']['name'][$qid] : '';
+                        if (!empty($file_name) && $_FILES['files']['error'][$qid] === UPLOAD_ERR_OK && is_allowed_upload_extension($file_name)) {
+                            $ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
+                            $stored_name = $submission_id . '_' . $qid . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+                            $dest = __DIR__ . '/../uploads/' . $stored_name;
+                            if (move_uploaded_file($_FILES['files']['tmp_name'][$qid], $dest)) {
+                                $ins->execute([':s' => $submission_id, ':q' => $qid, ':t' => $file_name, ':o' => null, ':fp' => $stored_name]);
+                            }
                         }
                     }
                 }
-            }
 
-            $pdo->commit();
-            $success = '回覆已更新。';
-            header('Location: ./view.php?id=' . (int) $submission['form_id']);
-            exit();
-        } catch (Throwable $e) {
-            if (!empty($pdo) && $pdo->inTransaction()) {
-                $pdo->rollBack();
+                $pdo->commit();
+                header('Location: ./view.php?id=' . (int) $submission['form_id']);
+                exit();
+            } catch (Throwable $e) {
+                if (!empty($pdo) && $pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                $errors[] = '更新失敗，請稍後再試。';
             }
-            $errors[] = '更新失敗，請稍後再試。';
         }
     }
+}
 ?>
-
 <!doctype html>
 <html lang="zh-Hant">
 <head>
@@ -213,55 +215,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $form && empty($errors)) {
 </head>
 <body>
     <?php $base_url = '../'; require '../includes/header.php'; ?>
-
     <?php require __DIR__ . '/../includes/right.php'; ?>
 
     <main class="section">
         <div class="container">
             <h1>編輯回覆</h1>
-            <?php if (!empty($errors)) : ?>
-                <div class="error"><ul><?php foreach ($errors as $e) : ?><li><?php echo htmlspecialchars($e); ?></li><?php endforeach; ?></ul></div>
-                <div class="panel" style="padding:20px"><a class="btn btn-ghost" href="./list.php">返回列表</a></div>
-            <?php elseif (!$form) : ?>
+            <?php if (!empty($errors)): ?>
+                <div class="error"><ul><?php foreach ($errors as $e): ?><li><?php echo htmlspecialchars($e); ?></li><?php endforeach; ?></ul></div>
+            <?php endif; ?>
+
+            <?php if (!$form): ?>
                 <div class="panel" style="padding:20px"><p class="muted">找不到指定的表單。</p><a class="btn btn-ghost" href="./list.php">返回列表</a></div>
-            <?php else : ?>
+            <?php else: ?>
                 <div class="panel" style="padding:20px">
                     <h2><?php echo htmlspecialchars($form['title']); ?></h2>
                     <p class="muted">編輯你之前送出的回覆。送出日：<?php echo !empty($submission['submitted_at']) ? date('Y-m-d H:i', strtotime($submission['submitted_at'])) : ''; ?></p>
                     <form method="post" action="./edit_submission.php?sid=<?php echo $submission_id; ?>" enctype="multipart/form-data">
                         <?php echo csrf_field(); ?>
-                        <?php foreach ($questions as $q) : ?>
+                        <?php foreach ($questions as $q): ?>
                             <div class="field" style="margin-top:16px">
-                                <label>
-                                    <?php echo htmlspecialchars($q['question_text']); ?>
-                                    <?php if ($q['is_required']) : ?><span class="muted">(必填)</span><?php endif; ?>
-                                </label>
-                                <?php if (in_array($q['question_type'], ['short_answer', 'long_answer'], true)) : ?>
+                                <label><?php echo htmlspecialchars($q['question_text']); ?><?php if ($q['is_required']): ?><span class="muted">(必填)</span><?php endif; ?></label>
+                                <?php if (in_array($q['question_type'], ['short_answer', 'long_answer'], true)): ?>
                                     <?php $val = $prefill_text[$q['id']] ?? ''; ?>
-                                    <?php if ($q['question_type'] === 'short_answer') : ?>
+                                    <?php if ($q['question_type'] === 'short_answer'): ?>
                                         <input name="answers[<?php echo $q['id']; ?>]" value="<?php echo htmlspecialchars($val); ?>" />
-                                    <?php else : ?>
+                                    <?php else: ?>
                                         <textarea name="answers[<?php echo $q['id']; ?>]" rows="3"><?php echo htmlspecialchars($val); ?></textarea>
                                     <?php endif; ?>
-                                <?php elseif ($q['question_type'] === 'multiple_choice') : ?>
+                                <?php elseif ($q['question_type'] === 'multiple_choice'): ?>
                                     <?php $sel = $prefill_options[$q['id']][0] ?? 0; ?>
-                                    <?php foreach ($options_map[$q['id']] ?? [] as $opt) : ?>
+                                    <?php foreach ($options_map[$q['id']] ?? [] as $opt): ?>
                                         <label style="display:block;margin-top:6px">
                                             <input type="radio" name="answers[<?php echo $q['id']; ?>]" value="<?php echo $opt['id']; ?>" <?php echo (int) $sel === (int) $opt['id'] ? 'checked' : ''; ?> />
                                             <?php echo htmlspecialchars($opt['option_text']); ?>
                                         </label>
                                     <?php endforeach; ?>
-                                <?php elseif ($q['question_type'] === 'multi_choice') : ?>
+                                <?php elseif ($q['question_type'] === 'multi_choice'): ?>
                                     <?php $sel_ids = $prefill_options[$q['id']] ?? []; ?>
-                                    <?php foreach ($options_map[$q['id']] ?? [] as $opt) : ?>
+                                    <?php foreach ($options_map[$q['id']] ?? [] as $opt): ?>
                                         <label style="display:block;margin-top:6px">
                                             <input type="checkbox" name="answers[<?php echo $q['id']; ?>][]" value="<?php echo $opt['id']; ?>" <?php echo in_array((int) $opt['id'], $sel_ids, true) ? 'checked' : ''; ?> />
                                             <?php echo htmlspecialchars($opt['option_text']); ?>
                                         </label>
                                     <?php endforeach; ?>
-                                <?php elseif ($q['question_type'] === 'file_upload') : ?>
+                                <?php elseif ($q['question_type'] === 'file_upload'): ?>
                                     <?php $val = $prefill_text[$q['id']] ?? ''; ?>
-                                    <input type="file" name="files[<?php echo $q['id']; ?>]" />
+                                    <?php if ($val): ?><p class="muted" style="font-size:0.85rem">原檔案：<?php echo htmlspecialchars($val); ?></p><?php endif; ?>
+                                    <input type="file" name="files[<?php echo $q['id']; ?>]" accept="<?php echo htmlspecialchars(get_upload_accept_string()); ?>" />
                                     <p class="muted" style="font-size:0.85rem">支援圖片、PDF、文件檔，上限 5 MB</p>
                                 <?php endif; ?>
                             </div>
@@ -277,5 +277,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $form && empty($errors)) {
     <script src="../js/app.js"></script>
 </body>
 </html>
-<?php
-exit();
+<?php exit();

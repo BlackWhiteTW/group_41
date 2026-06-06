@@ -23,7 +23,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $stmts = preg_split('/;\s*\n/', $sql);
                 try {
-                    $pdo->beginTransaction();
                     foreach ($stmts as $stmt) {
                         $stmt = trim($stmt);
                         if ($stmt === '') {
@@ -31,14 +30,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                         $pdo->exec($stmt);
                     }
-                    $pdo->commit();
                     $message = '資料庫已成功重新匯入（group_41.sql）。';
                     $status = 'success';
                 } catch (PDOException $e) {
-                    if ($pdo->inTransaction()) {
-                        $pdo->rollBack();
-                    }
-                    $message = '匯入失敗：' . htmlspecialchars($e->getMessage());
+                    $message = '匯入失敗，請檢查 SQL 檔案格式是否正確。';
                     $status = 'error';
                 }
             }

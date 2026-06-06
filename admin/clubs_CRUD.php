@@ -273,7 +273,7 @@ try {
                                     <?php echo csrf_field(); ?>
                                     <input type="hidden" name="action" value="delete_club" />
                                     <input type="hidden" name="club_id" value="<?php echo (int) $selected_club['id']; ?>" />
-                                    <button class="btn btn-ghost" type="submit" onclick="return confirm('確定要刪除社團「<?php echo htmlspecialchars($selected_club['name'], ENT_QUOTES); ?>」嗎？所有相關成員、表單與活動記錄將一併刪除，此動作無法復原。');" style="color: #b33">刪除社團</button>
+                                    <button class="btn btn-ghost" type="submit" data-confirm="確定要刪除社團「<?php echo htmlspecialchars($selected_club['name']); ?>」嗎？所有相關成員、表單與活動記錄將一併刪除，此動作無法復原。" style="color: #b33">刪除社團</button>
                                 </form>
                             </div>
 

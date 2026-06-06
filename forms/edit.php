@@ -105,8 +105,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $edit_id > 0 && empty($errors) && $
 	$description = trim($_POST['description'] ?? '');
 	$form_type = $_POST['form_type'] ?? 'public';
 	$status = $_POST['status'] ?? 'draft';
-	$open_at = trim($_POST['open_at'] ?? '');
-	$close_at = trim($_POST['close_at'] ?? '');
+	$open_at_date = trim($_POST['open_at_date'] ?? '');
+	$open_at_hour = $_POST['open_at_hour'] ?? '';
+	$open_at_minute = $_POST['open_at_minute'] ?? '';
+	$open_at = ($open_at_date !== '' && $open_at_hour !== '' && $open_at_minute !== '') ? $open_at_date . 'T' . $open_at_hour . ':' . $open_at_minute : '';
+
+	$close_at_date = trim($_POST['close_at_date'] ?? '');
+	$close_at_hour = $_POST['close_at_hour'] ?? '';
+	$close_at_minute = $_POST['close_at_minute'] ?? '';
+	$close_at = ($close_at_date !== '' && $close_at_hour !== '' && $close_at_minute !== '') ? $close_at_date . 'T' . $close_at_hour . ':' . $close_at_minute : '';
 	$allow_resubmit = empty($_POST['allow_resubmit']) ? 0 : 1;
 	$require_login = empty($_POST['require_login']) ? 0 : 1;
 	$target_club_ids_raw = isset($_POST['target_club_ids']) ? $_POST['target_club_ids'] : [];
@@ -357,12 +364,50 @@ $allowed_types = ['short_answer', 'long_answer', 'multiple_choice', 'multi_choic
 				</div>
 					<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
 						<div class="field">
-							<label for="open_at">預定開放時間 <span class="muted">（可選）</span></label>
-							<input type="datetime-local" id="open_at" name="open_at" value="<?php echo htmlspecialchars($editing_form['open_at'] ? str_replace(' ', 'T', substr($editing_form['open_at'], 0, 16)) : ''); ?>" />
+							<label>預定開放時間 <span class="muted">（可選）</span></label>
+							<div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center">
+								<?php
+									$oa_date = $editing_form['open_at'] ? substr($editing_form['open_at'], 0, 10) : '';
+									$oa_hour = $editing_form['open_at'] ? substr($editing_form['open_at'], 11, 2) : '';
+									$oa_min  = $editing_form['open_at'] ? substr($editing_form['open_at'], 14, 2) : '';
+								?>
+								<input type="date" name="open_at_date" value="<?php echo htmlspecialchars($oa_date); ?>" />
+								<select name="open_at_hour">
+									<option value="">時</option>
+									<?php for ($h = 0; $h < 24; $h++) : ?>
+										<option value="<?php echo sprintf('%02d', $h); ?>" <?php echo $oa_hour === sprintf('%02d', $h) ? 'selected' : ''; ?>><?php echo sprintf('%02d', $h); ?></option>
+									<?php endfor; ?>
+								</select>
+								<select name="open_at_minute">
+									<option value="">分</option>
+									<?php for ($m = 0; $m < 60; $m++) : ?>
+										<option value="<?php echo sprintf('%02d', $m); ?>" <?php echo $oa_min === sprintf('%02d', $m) ? 'selected' : ''; ?>><?php echo sprintf('%02d', $m); ?></option>
+									<?php endfor; ?>
+								</select>
+							</div>
 						</div>
 						<div class="field">
-							<label for="close_at">預定關閉時間 <span class="muted">（可選）</span></label>
-							<input type="datetime-local" id="close_at" name="close_at" value="<?php echo htmlspecialchars($editing_form['close_at'] ? str_replace(' ', 'T', substr($editing_form['close_at'], 0, 16)) : ''); ?>" />
+							<label>預定關閉時間 <span class="muted">（可選）</span></label>
+							<div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center">
+								<?php
+									$ca_date = $editing_form['close_at'] ? substr($editing_form['close_at'], 0, 10) : '';
+									$ca_hour = $editing_form['close_at'] ? substr($editing_form['close_at'], 11, 2) : '';
+									$ca_min  = $editing_form['close_at'] ? substr($editing_form['close_at'], 14, 2) : '';
+								?>
+								<input type="date" name="close_at_date" value="<?php echo htmlspecialchars($ca_date); ?>" />
+								<select name="close_at_hour">
+									<option value="">時</option>
+									<?php for ($h = 0; $h < 24; $h++) : ?>
+										<option value="<?php echo sprintf('%02d', $h); ?>" <?php echo $ca_hour === sprintf('%02d', $h) ? 'selected' : ''; ?>><?php echo sprintf('%02d', $h); ?></option>
+									<?php endfor; ?>
+								</select>
+								<select name="close_at_minute">
+									<option value="">分</option>
+									<?php for ($m = 0; $m < 60; $m++) : ?>
+										<option value="<?php echo sprintf('%02d', $m); ?>" <?php echo $ca_min === sprintf('%02d', $m) ? 'selected' : ''; ?>><?php echo sprintf('%02d', $m); ?></option>
+									<?php endfor; ?>
+								</select>
+							</div>
 						</div>
 					</div>
 				<div class="field">

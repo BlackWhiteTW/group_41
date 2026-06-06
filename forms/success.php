@@ -33,9 +33,6 @@ $submission_id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 					<?php endif; ?>
 					<div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap">
 						<a class="btn btn-primary" href="./list.php">返回表單列表</a>
-						<?php if ($submission_id && $user) : ?>
-							<a class="btn btn-ghost" href="./edit_submission.php?sid=<?php echo $submission_id; ?>">編輯回覆</a>
-						<?php endif; ?>
 						<a class="btn btn-ghost" href="../index.php">回首頁</a>
 					</div>
 				</div>

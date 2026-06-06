@@ -168,6 +168,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $form && empty($errors)) {
 						$errors[] = '題目「' . $q['question_text'] . '」檔案上傳失敗。';
 					} elseif ($size > 5 * 1024 * 1024) {
 						$errors[] = '題目「' . $q['question_text'] . '」檔案不可超過 5 MB。';
+					} elseif (!is_allowed_upload_extension($file)) {
+						$errors[] = '題目「' . $q['question_text'] . '」不支援此檔案類型，僅允許圖片、PDF、文件檔。';
+					} elseif (!validate_upload_content($tmp, $file)) {
+						$errors[] = '題目「' . $q['question_text'] . '」檔案內容驗證失敗，可能為偽造檔案。';
 					}
 				}
 			}
@@ -236,7 +240,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $form && empty($errors)) {
 					}
 				} elseif ($type === 'file_upload') {
 					$file_name = isset($_FILES['files']['name'][$qid]) ? $_FILES['files']['name'][$qid] : '';
-					if (!empty($file_name) && $_FILES['files']['error'][$qid] === UPLOAD_ERR_OK) {
+					if (!empty($file_name) && $_FILES['files']['error'][$qid] === UPLOAD_ERR_OK && is_allowed_upload_extension($file_name)) {
 						$ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
 						$stored_name = $submission_id . '_' . $qid . '_' . bin2hex(random_bytes(16)) . '.' . $ext;
 						$dest = __DIR__ . '/../uploads/' . $stored_name;
@@ -353,7 +357,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $form && empty($errors)) {
 												</label>
 											<?php endforeach; ?>
 										<?php elseif ($q['question_type'] === 'file_upload') : ?>
-											<input type="file" name="files[<?php echo $q['id']; ?>]" />
+											<input type="file" name="files[<?php echo $q['id']; ?>]" accept="<?php echo htmlspecialchars(get_upload_accept_string()); ?>" />
 											<p class="muted" style="font-size:0.85rem">支援圖片、PDF、文件檔，上限 5 MB</p>
 										<?php endif; ?>
 										<span class="field-error" style="display:none;color:#dc3545;font-size:0.85rem">此欄位為必填</span>

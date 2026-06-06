@@ -24,7 +24,13 @@ $defaults = [
 	'target_club_ids' => [],
 	'status' => 'draft',
 	'open_at' => '',
+	'open_at_date' => '',
+	'open_at_hour' => '',
+	'open_at_minute' => '',
 	'close_at' => '',
+	'close_at_date' => '',
+	'close_at_hour' => '',
+	'close_at_minute' => '',
 	'allow_resubmit' => 1,
 	'require_login' => 0
 ];
@@ -110,8 +116,21 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST' && $defaults['form_type'] === 'club_on
 		$target_input = array_values(array_unique(array_map('intval', $target_input)));
 		$defaults['target_club_ids'] = $target_input;
 		$defaults['status'] = isset($_POST['status']) ? $_POST['status'] : 'draft';
-		$defaults['open_at'] = isset($_POST['open_at']) ? trim($_POST['open_at']) : '';
-		$defaults['close_at'] = isset($_POST['close_at']) ? trim($_POST['close_at']) : '';
+		$open_at_date = isset($_POST['open_at_date']) ? trim($_POST['open_at_date']) : '';
+		$open_at_hour = $_POST['open_at_hour'] ?? '';
+		$open_at_minute = $_POST['open_at_minute'] ?? '';
+		$defaults['open_at_date'] = $open_at_date;
+		$defaults['open_at_hour'] = $open_at_hour;
+		$defaults['open_at_minute'] = $open_at_minute;
+		$defaults['open_at'] = ($open_at_date !== '' && $open_at_hour !== '' && $open_at_minute !== '') ? $open_at_date . 'T' . $open_at_hour . ':' . $open_at_minute : '';
+
+		$close_at_date = isset($_POST['close_at_date']) ? trim($_POST['close_at_date']) : '';
+		$close_at_hour = $_POST['close_at_hour'] ?? '';
+		$close_at_minute = $_POST['close_at_minute'] ?? '';
+		$defaults['close_at_date'] = $close_at_date;
+		$defaults['close_at_hour'] = $close_at_hour;
+		$defaults['close_at_minute'] = $close_at_minute;
+		$defaults['close_at'] = ($close_at_date !== '' && $close_at_hour !== '' && $close_at_minute !== '') ? $close_at_date . 'T' . $close_at_hour . ':' . $close_at_minute : '';
 		$defaults['allow_resubmit'] = empty($_POST['allow_resubmit']) ? 0 : 1;
 		$defaults['require_login'] = empty($_POST['require_login']) ? 0 : 1;
 
@@ -377,12 +396,40 @@ if (empty($question_defaults)) {
 					</div>
 					<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
 						<div class="field">
-							<label for="open_at">預定開放時間 <span class="muted">（可選）</span></label>
-							<input type="datetime-local" id="open_at" name="open_at" value="<?php echo htmlspecialchars($defaults['open_at']); ?>" />
+							<label>預定開放時間 <span class="muted">（可選）</span></label>
+							<div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center">
+								<input type="date" name="open_at_date" value="<?php echo htmlspecialchars($defaults['open_at_date']); ?>" />
+								<select name="open_at_hour">
+									<option value="">時</option>
+									<?php for ($h = 0; $h < 24; $h++) : ?>
+										<option value="<?php echo sprintf('%02d', $h); ?>" <?php echo $defaults['open_at_hour'] === sprintf('%02d', $h) ? 'selected' : ''; ?>><?php echo sprintf('%02d', $h); ?></option>
+									<?php endfor; ?>
+								</select>
+								<select name="open_at_minute">
+									<option value="">分</option>
+									<?php for ($m = 0; $m < 60; $m++) : ?>
+										<option value="<?php echo sprintf('%02d', $m); ?>" <?php echo $defaults['open_at_minute'] === sprintf('%02d', $m) ? 'selected' : ''; ?>><?php echo sprintf('%02d', $m); ?></option>
+									<?php endfor; ?>
+								</select>
+							</div>
 						</div>
 						<div class="field">
-							<label for="close_at">預定關閉時間 <span class="muted">（可選）</span></label>
-							<input type="datetime-local" id="close_at" name="close_at" value="<?php echo htmlspecialchars($defaults['close_at']); ?>" />
+							<label>預定關閉時間 <span class="muted">（可選）</span></label>
+							<div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center">
+								<input type="date" name="close_at_date" value="<?php echo htmlspecialchars($defaults['close_at_date']); ?>" />
+								<select name="close_at_hour">
+									<option value="">時</option>
+									<?php for ($h = 0; $h < 24; $h++) : ?>
+										<option value="<?php echo sprintf('%02d', $h); ?>" <?php echo $defaults['close_at_hour'] === sprintf('%02d', $h) ? 'selected' : ''; ?>><?php echo sprintf('%02d', $h); ?></option>
+									<?php endfor; ?>
+								</select>
+								<select name="close_at_minute">
+									<option value="">分</option>
+									<?php for ($m = 0; $m < 60; $m++) : ?>
+										<option value="<?php echo sprintf('%02d', $m); ?>" <?php echo $defaults['close_at_minute'] === sprintf('%02d', $m) ? 'selected' : ''; ?>><?php echo sprintf('%02d', $m); ?></option>
+									<?php endfor; ?>
+								</select>
+							</div>
 						</div>
 					</div>
 				<div class="field">

@@ -28,14 +28,29 @@ function start_user_session() {
                 $ttl = 3600;
                 // Extend the cookie TTL
                 if (!empty($_COOKIE['remember_active'])) {
-                    setcookie('remember_active', $_COOKIE['remember_active'], time() + $ttl, '/');
+                    setcookie('remember_active', $_COOKIE['remember_active'], [
+                        'expires' => time() + $ttl,
+                        'path' => '/',
+                        'httponly' => true,
+                        'samesite' => 'Lax'
+                    ]);
                 }
-                setcookie(session_name(), session_id(), time() + $ttl, '/', '', false, true);
+                setcookie(session_name(), session_id(), [
+                    'expires' => time() + $ttl,
+                    'path' => '/',
+                    'httponly' => true,
+                    'samesite' => 'Lax'
+                ]);
             } else {
                 session_unset();
                 session_destroy();
                 _clear_session_cookie();
-                setcookie('remember_active', '', time() - 3600, '/');
+                setcookie('remember_active', '', [
+                    'expires' => time() - 3600,
+                    'path' => '/',
+                    'httponly' => true,
+                    'samesite' => 'Lax'
+                ]);
             }
         }
     }
@@ -63,7 +78,12 @@ function set_user_session($username) {
     // Generate remember token
     _create_remember_token($username, $ttl);
 
-    setcookie(session_name(), session_id(), time() + $ttl, '/', '', false, true);
+    setcookie(session_name(), session_id(), [
+        'expires' => time() + $ttl,
+        'path' => '/',
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
 }
 
 // ─── Logout ───
@@ -77,7 +97,12 @@ function clear_user_session() {
     session_unset();
     session_destroy();
     _clear_session_cookie();
-    setcookie('remember_active', '', time() - 3600, '/');
+    setcookie('remember_active', '', [
+        'expires' => time() - 3600,
+        'path' => '/',
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
 }
 
 // ─── Update stored username (after rename) ───
@@ -169,7 +194,12 @@ function _create_remember_token($username, $ttl) {
         $stmt = $pdo->prepare('UPDATE users SET remember_token_hash = :hash WHERE id = :uid');
         $stmt->execute([':hash' => $tokenHash, ':uid' => $userRow['id']]);
 
-        setcookie('remember_active', $userRow['id'] . ':' . $rawToken, time() + $ttl, '/');
+        setcookie('remember_active', $userRow['id'] . ':' . $rawToken, [
+            'expires' => time() + $ttl,
+            'path' => '/',
+            'httponly' => true,
+            'samesite' => 'Lax'
+        ]);
     } catch (Throwable $e) {
         // Silently fail — session-only auth still works
     }

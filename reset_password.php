@@ -14,16 +14,12 @@ if ($token === '') {
     $errors[] = '缺少重設令牌，請從忘記密碼頁面重新操作。';
 } else {
     $pdo = get_db();
-    $stmt = $pdo->prepare('SELECT id, email, expires_at, used FROM password_resets WHERE token = :t ORDER BY created_at DESC LIMIT 1');
+    $stmt = $pdo->prepare('SELECT id, email FROM password_resets WHERE token = :t AND used = 0 AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1');
     $stmt->execute([':t' => $token]);
     $reset = $stmt->fetch();
 
     if (!$reset) {
-        $errors[] = '無效的重設令牌。';
-    } elseif ((int)$reset['used'] === 1) {
-        $errors[] = '此重設連結已被使用過。';
-    } elseif (strtotime($reset['expires_at']) < time()) {
-        $errors[] = '此重設連結已過期（有效期 1 小時），請重新申請。';
+        $errors[] = '無效或已過期的重設連結，請重新申請。';
     } else {
         $valid_token = true;
         $token_email = $reset['email'];

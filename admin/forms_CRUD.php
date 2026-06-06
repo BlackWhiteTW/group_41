@@ -197,7 +197,7 @@ try {
 										<?php echo csrf_field(); ?>
 										<input type="hidden" name="form_id" value="<?php echo (int) $form['id']; ?>" />
 										<input type="hidden" name="action" value="delete_form" />
-										<button class="btn btn-ghost" type="submit" onclick="return confirm('確定要刪除表單「<?php echo htmlspecialchars($form['title'], ENT_QUOTES); ?>」嗎？此動作無法復原。');" style="color: #b33">刪除</button>
+										<button class="btn btn-ghost" type="submit" data-confirm="確定要刪除表單「<?php echo htmlspecialchars($form['title']); ?>」嗎？此動作無法復原。" style="color: #b33">刪除</button>
 									</form>
 								</div>
 							</article>
