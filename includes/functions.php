@@ -134,3 +134,28 @@ function validate_upload_content($tmp_path, $filename)
 
     return false;
 }
+
+/**
+ * 確保 uploads/ 目錄存在且可寫入。
+ * 目錄不存在時自動建立，並補上禁止直接存取的 .htaccess。
+ * 上傳檔案的頁面在 move_uploaded_file() 前應先呼叫此函數。
+ *
+ * @return bool 目錄可用時回傳 true
+ */
+function ensure_uploads_dir()
+{
+    $dir = dirname(__DIR__) . '/uploads';
+
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
+
+    if (is_dir($dir)) {
+        $htaccess = $dir . '/.htaccess';
+        if (!file_exists($htaccess)) {
+            @file_put_contents($htaccess, "Require all denied\n");
+        }
+    }
+
+    return is_dir($dir) && is_writable($dir);
+}

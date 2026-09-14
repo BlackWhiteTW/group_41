@@ -182,7 +182,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $form && empty($errors)) {
                             $ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
                             $stored_name = $submission_id . '_' . $qid . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
                             $dest = __DIR__ . '/../uploads/' . $stored_name;
-                            if (move_uploaded_file($_FILES['files']['tmp_name'][$qid], $dest)) {
+                            if (ensure_uploads_dir() && move_uploaded_file($_FILES['files']['tmp_name'][$qid], $dest)) {
                                 $ins->execute([':s' => $submission_id, ':q' => $qid, ':t' => $file_name, ':o' => null, ':fp' => $stored_name]);
                             }
                         }
